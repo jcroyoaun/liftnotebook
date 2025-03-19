@@ -71,6 +71,7 @@ ALTER TABLE ONLY public.exercises ALTER COLUMN id SET DEFAULT nextval('public.ex
 
 COPY public.exercises (id, created_at, name, primarymuscles, secondarymuscles, version) FROM stdin;
 1	2025-03-19 05:40:56+00	Flat Bench Press	{"Chest, Anterior Delts"}	{Triceps}	1
+2	2025-03-19 05:48:09+00	Hack Squat	{Quadriceps}	{Glutes}	1
 \.
 
 
@@ -78,7 +79,7 @@ COPY public.exercises (id, created_at, name, primarymuscles, secondarymuscles, v
 -- Name: exercises_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.exercises_id_seq', 1, true);
+SELECT pg_catalog.setval('public.exercises_id_seq', 2, true);
 
 
 --
