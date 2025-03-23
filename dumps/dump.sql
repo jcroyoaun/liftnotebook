@@ -72,7 +72,7 @@ ALTER TABLE ONLY public.exercises ALTER COLUMN id SET DEFAULT nextval('public.ex
 COPY public.exercises (id, created_at, name, primarymuscles, secondarymuscles, version) FROM stdin;
 1	2025-03-19 05:40:56+00	Flat Bench Press	{"Chest, Anterior Delts"}	{Triceps}	1
 2	2025-03-19 05:48:09+00	Hack Squat	{Quadriceps}	{Glutes}	1
-3	2025-03-19 06:37:19+00	Romanian Deadlift	{"Hamstrings, Glutes"}	{Erectors}	1
+3	2025-03-19 06:37:19+00	Romanian Deadlift	{"Hamstrings, Glutes"}	{"Erectors, Lats"}	2
 \.
 
 
