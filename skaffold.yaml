@@ -1,0 +1,92 @@
+apiVersion: skaffold/v4beta12
+kind: Config
+metadata:
+  name: workoutracker
+build:
+  artifacts:
+    - image: exerciselib
+      context: microservices/exerciselib
+      docker:
+        dockerfile: Dockerfile
+    - image: frontend
+      context: microservices/frontend
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: "index.html"
+            dest: "/usr/share/nginx/html/"
+          - src: "css/**/*"
+            dest: "/usr/share/nginx/html/css/"
+          - src: "js/**/*"
+            dest: "/usr/share/nginx/html/js/"
+          - src: "nginx.conf"
+            dest: "/etc/nginx/conf.d/default.conf"
+  local:
+    push: false
+    useDockerCLI: true
+deploy:
+  helm:
+    releases:
+      - name: exerciselib
+        chartPath: helm/charts/microservice
+        namespace: exerciselib
+        createNamespace: true
+        valuesFiles:
+          - helm/environments/local.yaml
+          - helm/values/exerciselib.yaml
+        setValues:
+          image.repository: "exerciselib"
+          image.pullPolicy: "Never"
+      - name: frontend
+        chartPath: helm/charts/microservice
+        namespace: frontend
+        createNamespace: true
+        valuesFiles:
+          - helm/environments/local.yaml
+          - helm/values/frontend.yaml
+        setValues:
+          image.repository: "frontend"
+          image.pullPolicy: "Never"
+      - name: postgres
+        chartPath: helm/charts/microservice
+        namespace: postgres
+        createNamespace: true
+        valuesFiles:
+          - helm/environments/local.yaml
+          - helm/values/postgres.yaml
+      # - name: redis
+      #   chartPath: helm/charts/microservice
+      #   namespace: sentry
+      #   createNamespace: true
+      #   valuesFiles:
+      #     - helm/environments/local.yaml
+      #     - helm/values/redis.yaml
+      #   setValues:
+      #     image.pullPolicy: "Never"
+      # - name: sentry
+      #   chartPath: helm/charts/microservice
+      #   namespace: sentry
+      #   createNamespace: true
+      #   valuesFiles:
+      #     - helm/environments/local.yaml
+      #     - helm/values/sentry.yaml
+      #   setValues:
+      #     image.pullPolicy: "Never"
+
+portForward:
+  - resourceType: service
+    resourceName: exerciselib-svc
+    namespace: exerciselib
+    port: 4000
+    localPort: 4000
+  - resourceType: service
+    resourceName: frontend-svc
+    namespace: frontend
+    port: 80
+    localPort: 8080
+  - resourceType: service
+    resourceName: postgres-svc
+    namespace: postgres
+    port: 5432
+    localPort: 5432

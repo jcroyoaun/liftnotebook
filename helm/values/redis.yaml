@@ -1,0 +1,35 @@
+service:
+  name: redis
+  replicas: 1
+  dbConnection: "none"  # Temporarily disable database init container
+
+  container:
+    image: redis
+    tag: alpine
+    port: 6379
+    platform: "linux/amd64"
+    resources:
+      limits:
+        cpu: "0.5"
+        memory: 512Mi
+      requests:
+        cpu: "0.2"
+        memory: "256Mi"
+    probes:
+      startup:
+        tcpSocket: true
+      liveness:
+        tcpSocket: true
+
+  networkPolicy:
+    enabled: true
+    ingress:
+      - fromEndpoints:
+          - matchLabels:
+              app: sentry
+              io.kubernetes.pod.namespace: sentry
+        toPorts:
+          - ports:
+              - port: "6379"
+                protocol: TCP
+    egress: [] 

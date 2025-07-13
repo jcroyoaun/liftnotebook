@@ -1,0 +1,69 @@
+apiVersion: skaffold/v4beta12
+kind: Config
+metadata:
+  name: workoutracker
+build:
+  artifacts:
+    - image: jcroyoaun/exerciselib
+      context: microservices/exerciselib
+      docker:
+        dockerfile: Dockerfile
+    - image: jcroyoaun/frontend
+      context: microservices/frontend
+      docker:
+        dockerfile: Dockerfile
+  local:
+    push: false  # Don't push again when running locally
+deploy:
+  helm:
+    releases:
+      - name: exerciselib
+        chartPath: helm/charts/microservice
+        namespace: exerciselib
+        createNamespace: true
+        valuesFiles:
+          - helm/environments/local.yaml
+          - helm/values/exerciselib.yaml
+        setValues:
+          image.repository: "jcroyoaun/exerciselib"
+          image.tag: latest
+      - name: frontend
+        chartPath: helm/charts/microservice
+        namespace: frontend
+        createNamespace: true
+        valuesFiles:
+          - helm/environments/local.yaml
+          - helm/values/frontend.yaml
+        setValues:
+          image.repository: "jcroyoaun/frontend"
+          image.tag: latest
+      - name: postgres
+        chartPath: helm/charts/microservice
+        namespace: postgres
+        createNamespace: true
+        valuesFiles:
+          - helm/environments/local.yaml
+          - helm/values/postgres.yaml
+profiles:
+  - name: local
+    activation:
+      - command: dev
+    patches:
+      - op: add
+        path: /build/local
+        value:
+          push: false
+          useDockerCLI: true
+  - name: dev
+    patches:
+      - op: add
+        path: /build/local
+        value:
+          push: false
+          useDockerCLI: true
+  - name: prod
+    patches:
+      - op: add
+        path: /build/local
+        value:
+          push: true

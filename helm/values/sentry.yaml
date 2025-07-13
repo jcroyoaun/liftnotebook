@@ -1,0 +1,148 @@
+service:
+  name: sentry
+  replicas: 1
+  dbConnection: "k8s"  # Re-enable database check
+
+  volumes:
+    - name: sentry-config-volume
+      configMap:
+        name: sentry-config-file
+
+  # Custom init containers for Sentry setup
+  initContainers:
+    - name: sentry-upgrade
+      image: getsentry/sentry:latest
+      command: ['sentry', 'upgrade', '--noinput']
+      env:
+        - name: SENTRY_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: sentry-secrets
+              key: SENTRY_SECRET_KEY
+        - name: SENTRY_POSTGRES_HOST
+          value: "postgres-svc.postgres"
+        - name: SENTRY_POSTGRES_PORT
+          value: "5432"
+        - name: SENTRY_DB_NAME
+          value: "postgres"
+        - name: SENTRY_DB_USER
+          value: "postgres"
+        - name: SENTRY_DB_PASSWORD
+          value: "pa55word"
+        - name: SENTRY_REDIS_HOST
+          value: "redis-svc.sentry"
+        - name: SENTRY_REDIS_PORT
+          value: "6379"
+    - name: sentry-create-user
+      image: getsentry/sentry:latest
+      command: 
+        - /bin/sh
+        - -c
+        - |
+          # Check if superuser exists, if not create one
+          sentry exec -- "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(is_superuser=True).exists() or User.objects.create_superuser('admin@example.com', 'admin')"
+      env:
+        - name: SENTRY_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: sentry-secrets
+              key: SENTRY_SECRET_KEY
+        - name: SENTRY_POSTGRES_HOST
+          value: "postgres-svc.postgres"
+        - name: SENTRY_POSTGRES_PORT
+          value: "5432"
+        - name: SENTRY_DB_NAME
+          value: "postgres"
+        - name: SENTRY_DB_USER
+          value: "postgres"
+        - name: SENTRY_DB_PASSWORD
+          value: "pa55word"
+        - name: SENTRY_REDIS_HOST
+          value: "redis-svc.sentry"
+        - name: SENTRY_REDIS_PORT
+          value: "6379"
+
+  container:
+    image: getsentry/sentry
+    tag: "latest"
+    port: 9000
+    platform: "linux/amd64"
+    resources:
+      limits:
+        cpu: "1"
+        memory: 2Gi
+      requests:
+        cpu: "0.5"
+        memory: "1Gi"
+    probes:
+      startup:
+        path: /
+      liveness:
+        path: /
+    env:
+      - name: SENTRY_SECRET_KEY
+        valueFrom:
+          secretKeyRef:
+            name: sentry-secrets
+            key: SENTRY_SECRET_KEY
+      - name: SENTRY_POSTGRES_HOST
+        value: "postgres-svc.postgres"
+      - name: SENTRY_POSTGRES_PORT
+        value: "5432"
+      - name: SENTRY_DB_NAME
+        value: "sentry"
+      - name: SENTRY_DB_USER
+        value: "sentry"
+      - name: SENTRY_DB_PASSWORD
+        value: "sentry"
+      - name: SENTRY_REDIS_HOST
+        value: "redis-svc.sentry"
+      - name: SENTRY_REDIS_PORT
+        value: "6379"
+
+  configFiles:
+    sentry.conf.py: |-
+      import os
+      from sentry.conf.server import *
+      
+      DATABASES = {
+          'default': {
+              'ENGINE': 'sentry.db.postgres',
+              'NAME': 'sentry',
+              'USER': 'sentry',
+              'PASSWORD': 'sentry',
+              'HOST': 'postgres-svc.postgres',
+              'PORT': '5432',
+          }
+      }
+      
+      SENTRY_CACHE = 'sentry.cache.redis.RedisCache'
+      
+      BROKER_URL = 'redis://redis-svc.sentry:6379'
+      
+      SENTRY_WEB_HOST = '0.0.0.0'
+      SENTRY_WEB_PORT = 9000
+      SENTRY_WEB_OPTIONS = {
+          'workers': 3,
+      }
+
+  secretData:
+    SENTRY_SECRET_KEY: "change-me-to-a-real-secret-key-in-production-please"
+
+  networkPolicy:
+    enabled: true
+    ingress:
+      - fromEndpoints: []
+        toPorts:
+          - ports:
+              - port: "9000"
+                protocol: TCP
+    egress:
+      - toEndpoints:
+          - matchLabels:
+              app: postgres
+              io.kubernetes.pod.namespace: postgres
+        toPorts:
+          - ports:
+              - port: "5432"
+                protocol: TCP 

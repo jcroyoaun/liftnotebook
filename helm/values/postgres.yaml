@@ -1,0 +1,164 @@
+global:
+  tag: "16.8-alpine3.20"
+
+service:
+  name: postgres
+  persistence:
+    enabled: false
+  volumes:
+    - name: db-schema-volume
+      configMap:
+        name: postgres-config-file
+
+  container:
+    image: postgres
+    port: 5432
+    volumeMounts:
+      - name: db-schema-volume
+        mountPath: /docker-entrypoint-initdb.d/schema.sql
+        subPath: schema.sql
+    envFrom:
+      - secretRef:
+          name: postgres-secrets
+    probes:
+      startup:
+        tcpSocket: true
+        failureThreshold: 60
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 5
+      
+      readiness:
+        tcpSocket: true
+        failureThreshold: 3
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        timeoutSeconds: 3
+      
+      liveness:
+        tcpSocket: true
+        failureThreshold: 3
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+
+  configFiles:
+    schema.sql: |-
+      CREATE DATABASE "exerciselib";
+      \c exerciselib
+      CREATE ROLE exerciselib WITH LOGIN PASSWORD 'pa55word';
+      GRANT ALL PRIVILEGES ON DATABASE exerciselib TO exerciselib;
+      GRANT ALL PRIVILEGES ON SCHEMA public TO exerciselib;
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO exerciselib;
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO exerciselib;
+      CREATE EXTENSION IF NOT EXISTS citext;
+
+      -- Switch to the exerciselib user for the table creation
+      SET ROLE exerciselib;
+      
+      -- Create custom types first
+      CREATE TYPE body_part_enum AS ENUM ('chest', 'back', 'shoulders', 'biceps', 'triceps', 'quadriceps', 'hamstrings', 'glutes', 'calves', 'core', 'forearms', 'traps');
+      CREATE TYPE exercise_type_enum AS ENUM ('compound', 'isolation');
+      CREATE TYPE target_type_enum AS ENUM ('primary', 'secondary');
+
+      -- Movement Patterns
+      CREATE TABLE movement_patterns (
+          id bigserial PRIMARY KEY,
+          created_at timestamp(0) with time zone NOT NULL DEFAULT NOW(),
+          name text NOT NULL,
+          description text,
+          version integer NOT NULL DEFAULT 1
+      );
+
+      -- Muscles table
+      CREATE TABLE muscles (
+          id bigserial PRIMARY KEY,
+          created_at timestamp(0) with time zone NOT NULL DEFAULT NOW(),
+          name VARCHAR(100) NOT NULL UNIQUE,
+          body_part body_part_enum NOT NULL,
+          version integer NOT NULL DEFAULT 1
+      );
+
+      -- Exercises table (corrected)
+      CREATE TABLE exercises (
+          id bigserial PRIMARY KEY,
+          created_at timestamp(0) with time zone NOT NULL DEFAULT NOW(),
+          name text NOT NULL,
+          type exercise_type_enum NOT NULL,
+          movement_pattern_id bigint NOT NULL,
+          version integer NOT NULL DEFAULT 1,
+          FOREIGN KEY (movement_pattern_id) REFERENCES movement_patterns(id)
+      );
+
+      -- Exercise to Muscle Mapping (corrected)
+      CREATE TABLE exercise_muscles (
+          exercise_id bigint NOT NULL,
+          muscle_id bigint NOT NULL,
+          created_at timestamp(0) with time zone NOT NULL DEFAULT NOW(),
+          target_type target_type_enum NOT NULL,
+          version integer NOT NULL DEFAULT 1,
+          PRIMARY KEY (exercise_id, muscle_id),
+          FOREIGN KEY (exercise_id) REFERENCES exercises(id),
+          FOREIGN KEY (muscle_id) REFERENCES muscles(id)
+      );
+
+      -- Create indexes for better performance
+      CREATE INDEX idx_exercise_muscles_muscle_id ON exercise_muscles(muscle_id);
+      CREATE INDEX idx_exercises_movement_pattern_id ON exercises(movement_pattern_id);
+
+      -- Users table (already correct)
+      CREATE TABLE users (
+          id bigserial PRIMARY KEY,
+          created_at timestamp(0) with time zone NOT NULL DEFAULT NOW(),
+          name text NOT NULL,
+          email citext UNIQUE NOT NULL,
+          password_hash bytea NOT NULL,
+          activated bool NOT NULL,
+          version integer NOT NULL DEFAULT 1
+      );
+
+      -- Sample Movement Patterns
+
+      RESET ROLE;
+
+  secretData:
+    POSTGRES_PASSWORD: "pa55word"
+
+  networkPolicy:
+    enabled: true
+    ingress:
+      - fromEndpoints:
+          - matchLabels:
+              io.kubernetes.pod.namespace: kube-system
+              k8s-app: kube-dns
+        toPorts:
+          - ports:
+              - port: "53"
+                protocol: UDP
+              - port: "53"
+                protocol: TCP
+            rules:
+              dns:
+                - matchPattern: "*"
+      - fromEndpoints:
+          - matchLabels:
+              app: exerciselib
+              io.kubernetes.pod.namespace: exerciselib
+        toPorts:
+          - ports:
+              - port: "5432"
+                protocol: TCP
+    egress:
+      - toEndpoints:
+          - matchLabels:
+              io.kubernetes.pod.namespace: kube-system
+              k8s-app: kube-dns
+        toPorts:
+          - ports:
+              - port: "53"
+                protocol: UDP
+              - port: "53"
+                protocol: TCP
+            rules:
+              dns:
+                - matchPattern: "*"

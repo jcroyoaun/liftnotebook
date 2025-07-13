@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exercise Library - Modern UI</title>
+    <!-- Force no cache for development -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js v3 -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Toast notifications -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastify-js/1.12.0/toastify.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastify-js/1.12.0/toastify.min.css">
+    
+    <script>
+        // Tailwind config for custom animations
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                        'glow': 'glow 2s ease-in-out infinite',
+                        'float': 'float 3s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(10px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        },
+                        glow: {
+                            '0%, 100%': { boxShadow: '0 0 20px rgba(59, 130, 246, 0.5)' },
+                            '50%': { boxShadow: '0 0 30px rgba(59, 130, 246, 0.8)' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Local Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-gray-50 min-h-screen" x-data="exerciseApp()" x-init="init()">
+    <!-- Modern Navigation with Gradient -->
+    <nav class="glass sticky top-0 z-40 border-b border-gray-200/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center group">
+                        <div class="p-2 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 shadow-lg transform transition-transform group-hover:scale-110">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <h1 class="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                                Exercise Library
+                            </h1>
+                            <p class="text-xs text-gray-500">Exercise-to-Target-Muscle Admin UI</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Animated Stats -->
+                    <div class="ml-10 flex items-center space-x-6">
+                        <div class="text-center animate-fade-in">
+                            <div class="text-2xl font-bold text-gray-900" x-text="stats.totalExercises"></div>
+                            <div class="text-xs text-gray-500">Exercises</div>
+                        </div>
+                        <div class="text-center animate-fade-in" style="animation-delay: 0.1s">
+                            <div class="text-2xl font-bold text-gray-900" x-text="stats.totalMuscles"></div>
+                            <div class="text-xs text-gray-500">Muscles</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <button @click="openModal()" class="btn-primary-modern group">
+                        <svg class="h-5 w-5 mr-2 transform transition-transform group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Add Exercise
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <!-- Loading State -->
+        <div x-show="loading" class="flex flex-col items-center justify-center py-20">
+            <div class="loader"></div>
+            <p class="mt-4 text-gray-600 animate-pulse">Loading your fitness data...</p>
+        </div>
+
+        <!-- Main Content -->
+        <div x-show="!loading" x-cloak class="space-y-6 animate-fade-in">
+            <!-- Filters Section - Modern Glass Card -->
+            <div class="glass rounded-2xl p-6 shadow-xl card-hover">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900">Filter Exercises</h2>
+                    <div class="text-sm text-gray-500">
+                        <span x-show="loadingExercises" class="inline-flex items-center">
+                            <svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Updating...
+                        </span>
+                    </div>
+                </div>
+                
+                <form @submit.prevent="applyFilters()" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="space-y-2">
+                            <label for="name" class="block text-sm font-semibold text-gray-700">
+                                Exercise Name
+                            </label>
+                            <input type="text" id="name" x-model="filters.name" 
+                                   placeholder="Search exercises..." 
+                                   class="modern-input">
+                        </div>
+
+                        <div class="space-y-2">
+                            <label for="type" class="block text-sm font-semibold text-gray-700">
+                                Exercise Type
+                            </label>
+                            <select id="type" x-model="filters.type" class="modern-select">
+                                <option value="">All Types</option>
+                                <template x-for="type in exerciseTypes" :key="type">
+                                    <option :value="type" x-text="capitalizeFirst(type)"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label for="movement_pattern" class="block text-sm font-semibold text-gray-700">
+                                Movement Pattern
+                            </label>
+                            <input type="text" id="movement_pattern" 
+                                   x-model="filters.movement_pattern"
+                                   placeholder="push, pull, squat..." 
+                                   class="modern-input">
+                        </div>
+
+                        <div class="space-y-2">
+                            <label for="body_part" class="block text-sm font-semibold text-gray-700">
+                                Body Part
+                            </label>
+                            <select id="body_part" x-model="filters.body_part" class="modern-select">
+                                <option value="">All Body Parts</option>
+                                <template x-for="bodyPart in bodyParts" :key="bodyPart">
+                                    <option :value="bodyPart" x-text="capitalizeFirst(bodyPart)"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label for="muscle_id" class="block text-sm font-semibold text-gray-700">
+                                Target Muscle
+                            </label>
+                            <select id="muscle_id" x-model="filters.muscle_id" class="modern-select">
+                                <option value="">All Muscles</option>
+                                <template x-for="muscle in muscles" :key="muscle.id">
+                                    <option :value="muscle.id" x-text="`${muscle.name} (${muscle.body_part})`"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label for="movement_pattern_id" class="block text-sm font-semibold text-gray-700">
+                                Movement Category
+                            </label>
+                            <select id="movement_pattern_id" x-model="filters.movement_pattern_id" class="modern-select">
+                                <option value="">All Patterns</option>
+                                <template x-for="pattern in movementPatterns" :key="pattern.id">
+                                    <option :value="pattern.id" x-text="pattern.name"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button type="button" @click="resetFilters()" class="btn-secondary-modern">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            Reset
+                        </button>
+                        <button type="submit" class="btn-primary-modern">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                            </svg>
+                            Apply Filters
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Exercises Grid -->
+            <div class="space-y-4">
+                <template x-if="exercises.length === 0 && !loadingExercises">
+                    <div class="glass rounded-2xl p-12 text-center">
+                        <svg class="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p class="text-xl text-gray-600">No exercises found</p>
+                        <p class="text-sm text-gray-500 mt-2">Try adjusting your filters</p>
+                    </div>
+                </template>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <template x-for="exercise in exercises" :key="exercise.id">
+                        <div class="glass rounded-xl p-6 card-hover group">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="flex-1">
+                                    <h3 class="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors" 
+                                        x-text="exercise.name"></h3>
+                                    <div class="mt-2 flex items-center space-x-3">
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white" 
+                                              x-text="capitalizeFirst(exercise.type)"></span>
+                                        <span class="text-sm text-gray-600 font-medium" 
+                                              x-text="exercise.movement_pattern?.name || 'No Pattern'"></span>
+                                    </div>
+                                </div>
+                                <div class="flex space-x-1 ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button @click="editExercise(exercise)" 
+                                            class="p-2 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors">
+                                        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                        </svg>
+                                    </button>
+                                    <button @click="deleteExercise(exercise.id)" 
+                                            class="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors">
+                                        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="space-y-3">
+                                <div x-show="exercise.primary_muscles && exercise.primary_muscles.length > 0">
+                                    <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Primary Muscles</div>
+                                    <div class="flex flex-wrap gap-2">
+                                        <template x-for="muscle in exercise.primary_muscles" :key="muscle.id">
+                                            <span @click="filterByMuscle(muscle)" 
+                                                  class="muscle-tag muscle-primary"
+                                                  x-text="muscle.name"></span>
+                                        </template>
+                                    </div>
+                                </div>
+
+                                <div x-show="exercise.secondary_muscles && exercise.secondary_muscles.length > 0">
+                                    <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Secondary Muscles</div>
+                                    <div class="flex flex-wrap gap-2">
+                                        <template x-for="muscle in exercise.secondary_muscles" :key="muscle.id">
+                                            <span @click="filterByMuscle(muscle)" 
+                                                  class="muscle-tag muscle-secondary"
+                                                  x-text="muscle.name"></span>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modern Modal with Backdrop Blur -->
+    <div x-show="modalOpen" x-cloak class="fixed z-50 inset-0 overflow-y-auto" 
+         @keydown.escape.window="modalOpen = false">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div x-show="modalOpen" x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"
+                 class="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm transition-opacity"></div>
+
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+
+            <div x-show="modalOpen" x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                 x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                 x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                 class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <form @submit.prevent="saveExercise()">
+                    <div class="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4">
+                        <h3 class="text-xl font-bold text-white" 
+                            x-text="currentExercise ? 'Edit Exercise' : 'Create New Exercise'"></h3>
+                    </div>
+
+                    <div class="bg-white px-6 py-6">
+                        <div class="space-y-4">
+                            <div class="space-y-2">
+                                <label for="form-name" class="block text-sm font-semibold text-gray-700">
+                                    Exercise Name <span class="text-red-500">*</span>
+                                </label>
+                                <input type="text" id="form-name" x-model="formData.name" 
+                                       placeholder="e.g., Barbell Bench Press"
+                                       class="modern-input" required>
+                            </div>
+
+                            <div class="space-y-2">
+                                <label for="form-type" class="block text-sm font-semibold text-gray-700">
+                                    Exercise Type <span class="text-red-500">*</span>
+                                </label>
+                                <select id="form-type" x-model="formData.type" 
+                                        class="modern-select" required>
+                                    <option value="">Choose a type</option>
+                                    <template x-for="type in exerciseTypes" :key="type">
+                                        <option :value="type" x-text="capitalizeFirst(type)"></option>
+                                    </template>
+                                </select>
+                            </div>
+
+                            <div class="space-y-2">
+                                <label for="form-movement-pattern" class="block text-sm font-semibold text-gray-700">
+                                    Movement Pattern <span class="text-red-500">*</span>
+                                </label>
+                                <select id="form-movement-pattern" x-model="formData.movement_pattern_id" 
+                                        class="modern-select" required>
+                                    <option value="">Select a pattern</option>
+                                    <template x-for="pattern in movementPatterns" :key="pattern.id">
+                                        <option :value="pattern.id" x-text="pattern.name"></option>
+                                    </template>
+                                </select>
+                            </div>
+
+                            <div class="space-y-2">
+                                <label class="block text-sm font-semibold text-gray-700">
+                                    Primary Muscles
+                                </label>
+                                <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                                    <svg class="inline w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                                    </svg>
+                                    Note: Muscle selection requires backend API update
+                                </div>
+                                <div class="space-y-2 opacity-50 pointer-events-none">
+                                    <div class="flex flex-wrap gap-2 min-h-[40px] p-3 border-2 border-gray-200 rounded-xl bg-gray-50">
+                                        <template x-for="muscleId in formData.primary_muscles" :key="muscleId">
+                                            <span class="muscle-tag muscle-primary flex items-center">
+                                                <span x-text="muscles.find(m => m.id == muscleId)?.name"></span>
+                                                <button type="button" @click="removeMuscle(muscleId, 'primary')" class="ml-2 text-white hover:text-gray-200">
+                                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                            </span>
+                                        </template>
+                                        <template x-if="formData.primary_muscles.length === 0">
+                                            <span class="text-gray-400 text-sm">No primary muscles selected</span>
+                                        </template>
+                                    </div>
+                                    <select @change="addMuscle($event, 'primary')" class="modern-select">
+                                        <option value="">Add a primary muscle...</option>
+                                        <template x-for="bodyPart in bodyParts" :key="bodyPart">
+                                            <optgroup :label="capitalizeFirst(bodyPart)">
+                                                <template x-for="muscle in muscles.filter(m => m.body_part === bodyPart && !formData.primary_muscles.includes(muscle.id) && !formData.secondary_muscles.includes(muscle.id))" :key="muscle.id">
+                                                    <option :value="muscle.id" x-text="muscle.name"></option>
+                                                </template>
+                                            </optgroup>
+                                        </template>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="space-y-2">
+                                <label class="block text-sm font-semibold text-gray-700">
+                                    Secondary Muscles
+                                </label>
+                                <div class="space-y-2 opacity-50 pointer-events-none">
+                                    <div class="flex flex-wrap gap-2 min-h-[40px] p-3 border-2 border-gray-200 rounded-xl bg-gray-50">
+                                        <template x-for="muscleId in formData.secondary_muscles" :key="muscleId">
+                                            <span class="muscle-tag muscle-secondary flex items-center">
+                                                <span x-text="muscles.find(m => m.id == muscleId)?.name"></span>
+                                                <button type="button" @click="removeMuscle(muscleId, 'secondary')" class="ml-2 text-gray-600 hover:text-gray-800">
+                                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                            </span>
+                                        </template>
+                                        <template x-if="formData.secondary_muscles.length === 0">
+                                            <span class="text-gray-400 text-sm">No secondary muscles selected</span>
+                                        </template>
+                                    </div>
+                                    <select @change="addMuscle($event, 'secondary')" class="modern-select">
+                                        <option value="">Add a secondary muscle...</option>
+                                        <template x-for="bodyPart in bodyParts" :key="bodyPart">
+                                            <optgroup :label="capitalizeFirst(bodyPart)">
+                                                <template x-for="muscle in muscles.filter(m => m.body_part === bodyPart && !formData.primary_muscles.includes(muscle.id) && !formData.secondary_muscles.includes(muscle.id))" :key="muscle.id">
+                                                    <option :value="muscle.id" x-text="muscle.name"></option>
+                                                </template>
+                                            </optgroup>
+                                        </template>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 px-6 py-4">
+                        <div class="flex items-center justify-end space-x-3">
+                            <button type="button" @click="closeModal()" class="btn-secondary-modern">
+                                Cancel
+                            </button>
+                            <button type="submit" class="btn-primary-modern flex items-center">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                <span x-text="currentExercise ? 'Update Exercise' : 'Create Exercise'"></span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Local Scripts -->
+    <script src="js/app.js"></script>
+</body>
+</html>
