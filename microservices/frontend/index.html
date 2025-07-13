@@ -57,6 +57,37 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body class="bg-gray-50 min-h-screen" x-data="exerciseApp()" x-init="init()">
+    <!-- Alpine.js Debug Test -->
+    <div x-data="{ test: 'Alpine.js is working!' }" class="fixed top-4 right-4 bg-green-100 p-2 rounded z-50 text-sm" x-show="!loading">
+        <span x-text="test"></span>
+        <button @click="console.log('Alpine click test:', $data)" class="ml-2 text-blue-600">Test Click</button>
+    </div>
+
+    <!-- Modal State Debug -->
+    <div class="fixed top-16 right-4 bg-blue-100 p-2 rounded z-50 text-sm" x-show="!loading">
+        <span>Modal Open: </span><span x-text="modalOpen" class="font-bold"></span>
+        <button @click="modalOpen = !modalOpen" class="ml-2 text-blue-600">Toggle</button>
+    </div>
+
+    <!-- Muscle Data Debug -->
+    <div x-show="modalOpen" class="fixed top-28 right-4 bg-yellow-100 p-2 rounded z-50 text-xs max-w-xs overflow-auto max-h-48">
+        <div><strong>Debug Info:</strong></div>
+        <div>Muscles loaded: <span x-text="muscles.length"></span></div>
+        <div>Body parts: <span x-text="bodyParts.join(', ')"></span></div>
+        <div>Form primary: <span x-text="formData.primary_muscles.length"></span></div>
+        <div>Form secondary: <span x-text="formData.secondary_muscles.length"></span></div>
+        <div class="mt-1">
+            <strong>Available for 'legs':</strong>
+            <div x-text="muscles.filter(m => m.body_part === 'legs').length + ' muscles'"></div>
+        </div>
+        <div class="mt-2">
+            <button @click="if(muscles.length > 0) { formData.primary_muscles.push(muscles[0].id); console.log('🧪 Test: Added first muscle to primary') }" 
+                    class="bg-blue-500 text-white px-2 py-1 rounded text-xs">
+                Test Add Muscle
+            </button>
+        </div>
+    </div>
+
     <!-- Modern Navigation with Gradient -->
     <nav class="glass sticky top-0 z-40 border-b border-gray-200/50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -285,8 +316,10 @@
     </main>
 
     <!-- Modern Modal with Backdrop Blur -->
-    <div x-show="modalOpen" x-cloak class="fixed z-50 inset-0 overflow-y-auto" 
-         @keydown.escape.window="modalOpen = false">
+    <div x-show="modalOpen" x-cloak class="fixed z-50 inset-0 overflow-y-auto modal-debug" 
+         @keydown.escape.window="modalOpen = false" 
+         style="background: rgba(0,0,0,0.8) !important;"
+         @click.self="modalOpen = false">
         <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div x-show="modalOpen" x-transition:enter="ease-out duration-300"
                  x-transition:enter-start="opacity-0"
@@ -352,13 +385,7 @@
                                 <label class="block text-sm font-semibold text-gray-700">
                                     Primary Muscles
                                 </label>
-                                <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-                                    <svg class="inline w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-                                    </svg>
-                                    Note: Muscle selection requires backend API update
-                                </div>
-                                <div class="space-y-2 opacity-50 pointer-events-none">
+                                <div class="space-y-2">
                                     <div class="flex flex-wrap gap-2 min-h-[40px] p-3 border-2 border-gray-200 rounded-xl bg-gray-50">
                                         <template x-for="muscleId in formData.primary_muscles" :key="muscleId">
                                             <span class="muscle-tag muscle-primary flex items-center">
@@ -374,15 +401,21 @@
                                             <span class="text-gray-400 text-sm">No primary muscles selected</span>
                                         </template>
                                     </div>
-                                    <select @change="addMuscle($event, 'primary')" class="modern-select">
+                                    <select @change="addMuscle($event, 'primary')" class="modern-select" @click="console.log('🔥 Primary dropdown clicked')">
                                         <option value="">Add a primary muscle...</option>
+                                        <!-- Debug: Show all muscles without grouping -->
+                                        <template x-for="muscle in muscles.filter(m => !formData.primary_muscles.includes(m.id) && !formData.secondary_muscles.includes(m.id))" :key="muscle.id">
+                                            <option :value="muscle.id" x-text="`${muscle.name} (${muscle.body_part})`"></option>
+                                        </template>
+                                        <!-- Original grouped version (commented for debug)
                                         <template x-for="bodyPart in bodyParts" :key="bodyPart">
                                             <optgroup :label="capitalizeFirst(bodyPart)">
-                                                <template x-for="muscle in muscles.filter(m => m.body_part === bodyPart && !formData.primary_muscles.includes(muscle.id) && !formData.secondary_muscles.includes(muscle.id))" :key="muscle.id">
+                                                <template x-for="muscle in muscles.filter(m => m.body_part === bodyPart && !formData.primary_muscles.includes(m.id) && !formData.secondary_muscles.includes(m.id))" :key="muscle.id">
                                                     <option :value="muscle.id" x-text="muscle.name"></option>
                                                 </template>
                                             </optgroup>
                                         </template>
+                                        -->
                                     </select>
                                 </div>
                             </div>
@@ -391,7 +424,7 @@
                                 <label class="block text-sm font-semibold text-gray-700">
                                     Secondary Muscles
                                 </label>
-                                <div class="space-y-2 opacity-50 pointer-events-none">
+                                <div class="space-y-2">
                                     <div class="flex flex-wrap gap-2 min-h-[40px] p-3 border-2 border-gray-200 rounded-xl bg-gray-50">
                                         <template x-for="muscleId in formData.secondary_muscles" :key="muscleId">
                                             <span class="muscle-tag muscle-secondary flex items-center">
@@ -407,15 +440,21 @@
                                             <span class="text-gray-400 text-sm">No secondary muscles selected</span>
                                         </template>
                                     </div>
-                                    <select @change="addMuscle($event, 'secondary')" class="modern-select">
+                                    <select @change="addMuscle($event, 'secondary')" class="modern-select" @click="console.log('🔥 Secondary dropdown clicked')">
                                         <option value="">Add a secondary muscle...</option>
+                                        <!-- Debug: Show all muscles without grouping -->
+                                        <template x-for="muscle in muscles.filter(m => !formData.primary_muscles.includes(m.id) && !formData.secondary_muscles.includes(m.id))" :key="muscle.id">
+                                            <option :value="muscle.id" x-text="`${muscle.name} (${muscle.body_part})`"></option>
+                                        </template>
+                                        <!-- Original grouped version (commented for debug)
                                         <template x-for="bodyPart in bodyParts" :key="bodyPart">
                                             <optgroup :label="capitalizeFirst(bodyPart)">
-                                                <template x-for="muscle in muscles.filter(m => m.body_part === bodyPart && !formData.primary_muscles.includes(muscle.id) && !formData.secondary_muscles.includes(muscle.id))" :key="muscle.id">
+                                                <template x-for="muscle in muscles.filter(m => m.body_part === bodyPart && !formData.primary_muscles.includes(m.id) && !formData.secondary_muscles.includes(m.id))" :key="muscle.id">
                                                     <option :value="muscle.id" x-text="muscle.name"></option>
                                                 </template>
                                             </optgroup>
                                         </template>
+                                        -->
                                     </select>
                                 </div>
                             </div>

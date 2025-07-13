@@ -66,6 +66,86 @@ func (e ExerciseModel) Insert(exercise *Exercise) error {
 	return e.DB.QueryRowContext(ctx, query, args...).Scan(&exercise.ID, &exercise.CreatedAt, &exercise.Version)
 }
 
+func (e ExerciseModel) InsertMuscles(exerciseID int64, primaryMuscles, secondaryMuscles []int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// Start a transaction
+	tx, err := e.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Insert primary muscles
+	for _, muscleID := range primaryMuscles {
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO exercise_muscles (exercise_id, muscle_id, target_type)
+			VALUES ($1, $2, 'primary')
+			ON CONFLICT (exercise_id, muscle_id) DO UPDATE SET target_type = 'primary'
+		`, exerciseID, muscleID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Insert secondary muscles
+	for _, muscleID := range secondaryMuscles {
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO exercise_muscles (exercise_id, muscle_id, target_type)
+			VALUES ($1, $2, 'secondary')
+			ON CONFLICT (exercise_id, muscle_id) DO UPDATE SET target_type = 'secondary'
+		`, exerciseID, muscleID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (e ExerciseModel) UpdateMuscles(exerciseID int64, primaryMuscles, secondaryMuscles []int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// Start a transaction
+	tx, err := e.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Remove existing muscle relationships
+	_, err = tx.ExecContext(ctx, `DELETE FROM exercise_muscles WHERE exercise_id = $1`, exerciseID)
+	if err != nil {
+		return err
+	}
+
+	// Insert primary muscles
+	for _, muscleID := range primaryMuscles {
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO exercise_muscles (exercise_id, muscle_id, target_type)
+			VALUES ($1, $2, 'primary')
+		`, exerciseID, muscleID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Insert secondary muscles
+	for _, muscleID := range secondaryMuscles {
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO exercise_muscles (exercise_id, muscle_id, target_type)
+			VALUES ($1, $2, 'secondary')
+		`, exerciseID, muscleID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (e ExerciseModel) Get(id int64) (*Exercise, error) {
 	if id < 1 {
 		return nil, ErrRecordNotFound

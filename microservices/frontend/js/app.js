@@ -48,34 +48,54 @@ function exerciseApp() {
         
         // Methods
         async init() {
-            console.log('Initializing app...', { cacheBuster });
+            console.log('🚀 Initializing app...', { cacheBuster });
+            console.log('🚀 Alpine.js version:', window.Alpine?.version || 'Not found');
+            
             try {
                 await this.loadInitialData();
                 await this.loadExercises();
+                console.log('✅ App initialization completed successfully');
             } catch (error) {
-                console.error('Init error:', error);
+                console.error('❌ Init error:', error);
                 this.showError('Failed to load initial data');
             } finally {
                 this.loading = false;
+                console.log('🚀 Loading state set to false');
             }
         },
         
         async loadInitialData() {
             try {
+                console.log('🔄 Loading muscles...');
                 // Load muscles
                 const musclesResponse = await fetch(`/v1/muscles?_=${cacheBuster}`);
+                console.log('🔄 Muscles response status:', musclesResponse.status);
+                
                 const musclesData = await musclesResponse.json();
+                console.log('🔄 Muscles data received:', musclesData);
+                
                 this.muscles = musclesData.muscles || [];
                 this.stats.totalMuscles = this.muscles.length;
+                
+                console.log('🔄 Processed muscles:', this.muscles.length);
+                console.log('🔄 First few muscles:', this.muscles.slice(0, 3));
                 
                 // Extract body parts
                 const bodyPartsSet = new Set(this.muscles.map(m => m.body_part));
                 this.bodyParts = Array.from(bodyPartsSet).sort();
                 
+                console.log('🔄 Body parts extracted:', this.bodyParts);
+                
+                console.log('🔄 Loading movement patterns...');
                 // Load movement patterns
                 const patternsResponse = await fetch(`/v1/movement-patterns?_=${cacheBuster}`);
+                console.log('🔄 Patterns response status:', patternsResponse.status);
+                
                 const patternsData = await patternsResponse.json();
+                console.log('🔄 Patterns data received:', patternsData);
+                
                 this.movementPatterns = patternsData.movement_patterns || [];
+                console.log('🔄 Processed movement patterns:', this.movementPatterns.length);
             } catch (error) {
                 console.error('Error loading initial data:', error);
                 throw error;
@@ -126,8 +146,14 @@ function exerciseApp() {
         },
         
         openModal(exercise = null) {
+            console.log('🔄 Opening modal for:', exercise ? 'edit' : 'create');
+            console.log('🔄 Current modal state:', this.modalOpen);
+            console.log('🔄 Available muscles:', this.muscles.length);
+            console.log('🔄 Available movement patterns:', this.movementPatterns.length);
+            
             this.currentExercise = exercise;
             if (exercise) {
+                console.log('🔄 Editing exercise:', exercise);
                 this.formData = {
                     name: exercise.name,
                     type: exercise.type,
@@ -136,6 +162,7 @@ function exerciseApp() {
                     secondary_muscles: exercise.secondary_muscles?.map(m => m.id) || []
                 };
             } else {
+                console.log('🔄 Creating new exercise');
                 this.formData = {
                     name: '',
                     type: '',
@@ -144,7 +171,10 @@ function exerciseApp() {
                     secondary_muscles: []
                 };
             }
+            
             this.modalOpen = true;
+            console.log('🔄 Modal opened, new state:', this.modalOpen);
+            console.log('🔄 Form data:', this.formData);
         },
         
         closeModal() {
@@ -167,7 +197,9 @@ function exerciseApp() {
                 const payload = {
                     name: this.formData.name,
                     type: this.formData.type,
-                    movement_pattern_id: parseInt(this.formData.movement_pattern_id)
+                    movement_pattern_id: parseInt(this.formData.movement_pattern_id),
+                    primary_muscles: this.formData.primary_muscles,
+                    secondary_muscles: this.formData.secondary_muscles
                 };
                 
                 const response = await fetch(url, {
@@ -217,21 +249,40 @@ function exerciseApp() {
         
         // Muscle management methods
         addMuscle(event, type) {
+            console.log('🔥 addMuscle called:', { type, selectedValue: event.target.value });
+            console.log('🔥 Available muscles:', this.muscles.length);
+            console.log('🔥 Current formData:', this.formData);
+            
             const muscleId = parseInt(event.target.value);
-            if (!muscleId) return;
+            console.log('🔥 Parsed muscleId:', muscleId);
+            
+            if (!muscleId) {
+                console.log('❌ No valid muscle ID selected');
+                return;
+            }
+            
+            const selectedMuscle = this.muscles.find(m => m.id === muscleId);
+            console.log('🔥 Selected muscle:', selectedMuscle);
             
             if (type === 'primary') {
                 if (!this.formData.primary_muscles.includes(muscleId)) {
                     this.formData.primary_muscles.push(muscleId);
+                    console.log('✅ Added to primary muscles:', this.formData.primary_muscles);
+                } else {
+                    console.log('⚠️ Muscle already in primary list');
                 }
             } else {
                 if (!this.formData.secondary_muscles.includes(muscleId)) {
                     this.formData.secondary_muscles.push(muscleId);
+                    console.log('✅ Added to secondary muscles:', this.formData.secondary_muscles);
+                } else {
+                    console.log('⚠️ Muscle already in secondary list');
                 }
             }
             
             // Reset the select
             event.target.value = '';
+            console.log('🔥 Reset dropdown value');
         },
         
         removeMuscle(muscleId, type) {
@@ -240,6 +291,18 @@ function exerciseApp() {
             } else {
                 this.formData.secondary_muscles = this.formData.secondary_muscles.filter(id => id !== muscleId);
             }
+        },
+        
+        getMusclesByBodyPart(bodyPart) {
+            return this.muscles.filter(muscle => muscle.body_part === bodyPart);
+        },
+        
+        getAvailableMuscles(bodyPart) {
+            return this.muscles.filter(muscle => 
+                muscle.body_part === bodyPart && 
+                !this.formData.primary_muscles.includes(muscle.id) && 
+                !this.formData.secondary_muscles.includes(muscle.id)
+            );
         },
         
         // Utilities

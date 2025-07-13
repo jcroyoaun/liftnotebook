@@ -17,6 +17,8 @@ func (app *application) createExerciseHandler(w http.ResponseWriter, r *http.Req
 		Name              string            `json:"name"`
 		Type              data.ExerciseType `json:"type"`
 		MovementPatternID int64             `json:"movement_pattern_id"`
+		PrimaryMuscles    []int64           `json:"primary_muscles"`
+		SecondaryMuscles  []int64           `json:"secondary_muscles"`
 	}
 
 	err := app.readJSON(w, r, &input)
@@ -45,6 +47,20 @@ func (app *application) createExerciseHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Insert muscle relationships
+	err = app.models.Exercises.InsertMuscles(exercise.ID, input.PrimaryMuscles, input.SecondaryMuscles)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	// Reload the exercise with its muscle relationships
+	exercise, err = app.models.Exercises.Get(exercise.ID)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
 	headers := make(http.Header)
 	headers.Set("Location", fmt.Sprintf("/v1/exercises/%d", exercise.ID))
 
@@ -53,7 +69,6 @@ func (app *application) createExerciseHandler(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
-
 }
 
 // Add a showExerciseHandler for the "GET /v1/exercises/:id" endpoint. For now, we retrieve
@@ -109,6 +124,8 @@ func (app *application) updateExerciseHandler(w http.ResponseWriter, r *http.Req
 		Name              *string            `json:"name"`
 		Type              *data.ExerciseType `json:"type"`
 		MovementPatternID *int64             `json:"movement_pattern_id"`
+		PrimaryMuscles    []int64            `json:"primary_muscles"`
+		SecondaryMuscles  []int64            `json:"secondary_muscles"`
 	}
 
 	err = app.readJSON(w, r, &input)
@@ -145,6 +162,22 @@ func (app *application) updateExerciseHandler(w http.ResponseWriter, r *http.Req
 		default:
 			app.serverErrorResponse(w, r, err)
 		}
+		return
+	}
+
+	// Update muscle relationships if provided
+	if input.PrimaryMuscles != nil || input.SecondaryMuscles != nil {
+		err = app.models.Exercises.UpdateMuscles(exercise.ID, input.PrimaryMuscles, input.SecondaryMuscles)
+		if err != nil {
+			app.serverErrorResponse(w, r, err)
+			return
+		}
+	}
+
+	// Reload the exercise with its muscle relationships
+	exercise, err = app.models.Exercises.Get(exercise.ID)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 
