@@ -57,7 +57,8 @@ locals {
     }
     
     cluster_admin_arns = [
-      "arn:aws:iam::443311183770:user/iamadmin"  # Update with your IAM user
+      "arn:aws:iam::443311183770:user/iamadmin",
+      "arn:aws:iam::443311183770:role/Github-Actions-Runner-OIDC"
     ]
     
     addon_versions = {
