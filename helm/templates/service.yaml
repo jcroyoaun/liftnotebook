@@ -10,6 +10,12 @@ spec:
     - port: {{ .Values.service.port }}
       targetPort: {{ .Values.service.targetPort }}
       protocol: TCP
+      # If metrics are enabled, name the port 'metrics' for the ServiceMonitor.
+      # Otherwise, name it 'http'. The Ingress finds it by port number, so it doesn't care.
+      {{- if .Values.metrics.enabled }}
+      name: metrics
+      {{- else }}
       name: http
+      {{- end }}
   selector:
     {{- include "microservice.selectorLabels" . | nindent 4 }}

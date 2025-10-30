@@ -47,7 +47,7 @@ resources:
     memory: 128Mi
 
 env:
-  EXERCISELIB_DB_DSN: "" 
+  EXERCISELIB_DB_DSN: ""
 
 probes:
   liveness:
@@ -68,3 +68,6 @@ probes:
     periodSeconds: 5
     timeoutSeconds: 3
     failureThreshold: 3
+
+metrics:
+  enabled: true
