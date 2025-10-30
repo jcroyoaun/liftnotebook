@@ -1,3 +1,4 @@
+// in exerciselib/cmd/api/middleware.go
 package main
 
 import (
@@ -9,6 +10,48 @@ import (
 	"github.com/tomasen/realip"
 	"golang.org/x/time/rate"
 )
+
+// metricsResponseWriter is a wrapper for http.ResponseWriter that
+// captures the HTTP status code.
+type metricsResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+// Helper to create a new metricsResponseWriter
+func newMetricsResponseWriter(w http.ResponseWriter) *metricsResponseWriter {
+	// Default to 200 OK, in case WriteHeader is never called.
+	return &metricsResponseWriter{w, http.StatusOK}
+}
+
+// Override the WriteHeader method to capture the status code.
+func (mw *metricsResponseWriter) WriteHeader(statusCode int) {
+	mw.statusCode = statusCode
+	mw.ResponseWriter.WriteHeader(statusCode)
+}
+
+// metrics middleware wraps another http.HandlerFunc to record metrics.
+// We pass the "path" template (e.g., "/v1/exercises/:id")
+// so we don't have a cardinality explosion.
+func (app *application) metrics(next http.HandlerFunc, path string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Start the timer
+		start := time.Now()
+
+		// Create our wrapper response writer
+		mw := newMetricsResponseWriter(w)
+
+		// Call the actual handler, passing our wrapper
+		next.ServeHTTP(mw, r)
+
+		// On the way out, record the metrics
+		duration := time.Since(start)
+		statusCode := fmt.Sprintf("%d", mw.statusCode) // convert int to string
+
+		http_requests_total.WithLabelValues(r.Method, path, statusCode).Inc()
+		http_request_duration_seconds.WithLabelValues(r.Method, path, statusCode).Observe(duration.Seconds())
+	}
+}
 
 func (app *application) recoverPanic(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
