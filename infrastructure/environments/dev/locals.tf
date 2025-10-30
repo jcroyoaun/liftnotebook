@@ -100,8 +100,94 @@ locals {
           ]
         })
       }
+      
+      kube_prometheus_stack = {
+        repository     = "https://prometheus-community.github.io/helm-charts"
+        chart          = "kube-prometheus-stack"
+        version        = "67.4.0"
+        namespace      = "monitoring"
+        create_namespace = true
+        values_content = yamlencode({
+          prometheus = {
+            prometheusSpec = {
+              retention = "15d"
+              storageSpec = {
+                volumeClaimTemplate = {
+                  spec = {
+                    storageClassName = "gp3"
+                    accessModes      = ["ReadWriteOnce"]
+                    resources = {
+                      requests = {
+                        storage = "50Gi"
+                      }
+                    }
+                  }
+                }
+              }
+              resources = {
+                requests = {
+                  cpu    = "500m"
+                  memory = "2Gi"
+                }
+                limits = {
+                  cpu    = "1000m"
+                  memory = "4Gi"
+                }
+              }
+            }
+          }
+          
+          grafana = {
+            enabled = true
+            adminPassword = "CHANGEME"  # TODO: Move to secrets
+            
+            ingress = {
+              enabled = true
+              ingressClassName = "alb"
+              annotations = {
+                "alb.ingress.kubernetes.io/scheme"                    = "internet-facing"
+                "alb.ingress.kubernetes.io/target-type"               = "ip"
+                "alb.ingress.kubernetes.io/listen-ports"              = jsonencode([{HTTPS = 443}])
+                "external-dns.alpha.kubernetes.io/hostname"           = "grafana.liftnotebook.jcroyoaun.com"
+              }
+              hosts = ["grafana.liftnotebook.jcroyoaun.com"]
+            }
+            
+            persistence = {
+              enabled          = true
+              storageClassName = "gp3"
+              size             = "10Gi"
+            }
+            
+            resources = {
+              requests = {
+                cpu    = "100m"
+                memory = "256Mi"
+              }
+              limits = {
+                cpu    = "200m"
+                memory = "512Mi"
+              }
+            }
+          }
+          
+          alertmanager = {
+            enabled = false  # Enable later when you set up alerts
+          }
+          
+          # Enable service monitors for your apps
+          prometheus-node-exporter = {
+            enabled = true
+          }
+          
+          kube-state-metrics = {
+            enabled = true
+          }
+        })
+      }
     }
   }
+
 
   k8s_manifests = {
     karpenter_nodepool = {

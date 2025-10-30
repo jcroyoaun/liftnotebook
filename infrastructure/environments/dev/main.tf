@@ -35,7 +35,7 @@ module "vpc" {
 
 # EKS Module
 module "eks" {
-  source = "git::https://github.com/jcroyoaun/terraform-aws-modules.git//modules/eks?ref=v1.0.7"
+  source = "git::https://github.com/jcroyoaun/terraform-aws-modules.git//modules/eks?ref=v1.0.10"
 
   region              = local.region
   env                 = local.env
@@ -74,7 +74,7 @@ data "aws_eks_cluster_auth" "cluster" {
 
 
 module "k8s_manifests" {
-  source = "git::https://github.com/jcroyoaun/terraform-aws-modules.git//modules/k8s-manifests?ref=v1.0.6"
+  source = "git::https://github.com/jcroyoaun/terraform-aws-modules.git//modules/k8s-manifests?ref=v1.0.10"
 
   manifests = local.k8s_manifests
 
