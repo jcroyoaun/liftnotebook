@@ -1,4 +1,19 @@
 # Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+terraform.tfplan
+tfplan
+.terraformrc
+terraform.rc
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Also in subdirectories
 **/.terraform/
 **/.terraform.lock.hcl
 **/*.tfstate
@@ -6,26 +21,22 @@
 **/*.tfvars
 **/terraform.tfplan
 **/tfplan
-**/.terraformrc
-**/terraform.rc
-**/override.tf
-**/override.tf.json
-**/*_override.tf
-**/*_override.tf.json
 
 # Crash log files
+crash.log
+crash.*.log
 **/crash.log
 **/crash.*.log
 
 # Sensitive files
-**/*.pem
-**/*.key
-**/*.crt
+*.pem
+*.key
+*.crt
 
 # Backup files
-**/*.backup
-**/*.bak
-**/*~
+*.backup
+*.bak
+*~
 
 # OS files
 .DS_Store
@@ -41,7 +52,6 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
-*~
 
 # Logs
 *.log
@@ -52,8 +62,11 @@ Thumbs.db
 .env.*.local
 
 # Helm
+Chart.lock
+charts/*.tgz
 **/Chart.lock
 **/charts/*.tgz
 
 # K8s
+kubeconfig
 **/kubeconfig

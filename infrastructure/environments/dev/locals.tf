@@ -98,4 +98,21 @@ locals {
       }
     }
   }
+
+  k8s_manifests = {
+    karpenter_nodepool = {
+      file_path = "${path.module}/manifests/karpenter-nodepool.yaml.tpl"
+      vars = {
+        cluster_name = local.eks.cluster_name
+      }
+    }
+    karpenter_ec2nodeclass = {
+      file_path = "${path.module}/manifests/karpenter-ec2nodeclass.yaml.tpl"
+      vars = {
+        cluster_name   = local.eks.cluster_name
+        karpenter_role = module.eks.karpenter_node_role_name
+        discovery_tag  = local.eks.cluster_name
+      }
+    }
+  }
 }

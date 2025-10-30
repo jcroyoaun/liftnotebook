@@ -63,3 +63,14 @@ module "eks" {
   karpenter_namespace = local.eks.karpenter.namespace
 
 }
+
+module "k8s_manifests" {
+  source = "git::https://github.com/jcroyoaun/terraform-aws-modules.git//modules/k8s-manifests?ref=v1.0.5"
+
+  manifests = local.k8s_manifests
+
+  cluster_ready_dependency = [
+    module.eks.cluster_id,
+    module.eks.karpenter_node_role_arn
+  ]
+}
