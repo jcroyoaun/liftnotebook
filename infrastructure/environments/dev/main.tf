@@ -35,7 +35,7 @@ module "vpc" {
 
 # EKS Module
 module "eks" {
-  source = "git::https://github.com/jcroyoaun/terraform-aws-modules.git//modules/eks?ref=v1.0.0"
+  source = "git::https://github.com/jcroyoaun/terraform-aws-modules.git//modules/eks?ref=v1.0.4"
 
   region              = local.region
   env                 = local.env
@@ -57,4 +57,9 @@ module "eks" {
   
   external_dns_domain_filters   = [module.dns.external_dns_domain_filter]
   external_dns_hosted_zone_arns = [module.dns.external_dns_hosted_zone_arn]
+
+  enable_karpenter    = local.eks.karpenter.enabled
+  karpenter_version   = local.eks.karpenter.version
+  karpenter_namespace = local.eks.karpenter.namespace
+
 }

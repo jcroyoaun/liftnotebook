@@ -1,1 +1,59 @@
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+**/terraform.tfplan
+**/tfplan
+**/.terraformrc
+**/terraform.rc
+**/override.tf
+**/override.tf.json
+**/*_override.tf
+**/*_override.tf.json
+
+# Crash log files
+**/crash.log
+**/crash.*.log
+
+# Sensitive files
+**/*.pem
+**/*.key
+**/*.crt
+
+# Backup files
+**/*.backup
+**/*.bak
+**/*~
+
+# OS files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Local env files
+.env
+.env.local
+.env.*.local
+
+# Helm
+**/Chart.lock
+**/charts/*.tgz
+
+# K8s
+**/kubeconfig

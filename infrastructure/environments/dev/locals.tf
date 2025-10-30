@@ -25,28 +25,28 @@ locals {
 
   # VPC configuration
   vpc = {
-    cidr           = "10.0.0.0/16"
-    public_subnets = ["10.0.0.0/24", "10.0.1.0/24"]
+    cidr           = "10.24.0.0/16"
+    public_subnets = ["10.24.0.0/24", "10.24.1.0/24"]
     azs            = ["a", "b"]
     
     private_subnets = {
-      private_1 = { cidr = "10.0.16.0/20", az = "a" }
-      private_2 = { cidr = "10.0.32.0/20", az = "b" }
+      private_1 = { cidr = "10.24.16.0/20", az = "a" }
+      private_2 = { cidr = "10.24.32.0/20", az = "b" }
     }
 
     # Isolated subnets for databases
     create_isolated_subnets = true
-    isolated_subnet_cidrs   = ["10.0.128.0/24", "10.0.129.0/24"]
+    isolated_subnet_cidrs   = ["10.24.48.0/24", "10.24.49.0/24"]
   }
 
   # EKS configuration
   eks = {
-    cluster_name       = "${local.env}-liftnotebook-cluster"
-    kubernetes_version = "1.33"
+    cluster_name       = "${local.env}-eks-cluster"
+    kubernetes_version = "1.34"
     
     node_group = {
       name           = "initial"
-      instance_types = ["t3.medium","t3.large","m6.medium","m6.large"]
+      instance_types = ["t3a.medium","t3a.large"]
       capacity_type  = "SPOT"
       scaling_config = {
         desired_size = 2
@@ -71,6 +71,31 @@ locals {
     helm_chart_versions = {
       aws_load_balancer_controller = "1.10.1"
       external_dns                 = "1.15.0"
+    }
+
+    # Karpenter configuration
+    karpenter = {
+      enabled   = true
+      version   = "1.8.1"
+      namespace = "kube-system"
+    }
+
+    helm_charts = {
+      metrics_server = {
+        repository     = "https://kubernetes-sigs.github.io/metrics-server"
+        chart          = "metrics-server"
+        version        = "3.12.2"
+        namespace      = "kube-system"
+        values_content = yamlencode({
+          defaultArgs = [
+            "--cert-dir=/tmp",
+            "--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+            "--kubelet-use-node-status-port",
+            "--metric-resolution=15s",
+            "--secure-port=10250"
+          ]
+        })
+      }
     }
   }
 }
