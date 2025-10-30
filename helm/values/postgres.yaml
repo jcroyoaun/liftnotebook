@@ -1,0 +1,88 @@
+replicaCount: 1
+
+image:
+  repository: postgres
+  pullPolicy: IfNotPresent
+  tag: "16-alpine"
+
+nameOverride: "postgres"
+fullnameOverride: "postgres"
+
+serviceAccount:
+  create: false
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 999
+
+securityContext:
+  runAsUser: 999
+  runAsNonRoot: true
+
+service:
+  type: ClusterIP
+  port: 5432
+  targetPort: 5432
+
+# Enable StatefulSet instead of Deployment
+statefulSet:
+  enabled: true
+
+
+# Mount init script
+volumes:
+  - name: postgres-data
+    emptyDir: {}
+  - name: init-scripts
+    configMap:
+      name: postgres-init-scripts
+
+volumeMounts:
+  - name: postgres-data
+    mountPath: /var/lib/postgresql/data
+  - name: init-scripts
+    mountPath: /docker-entrypoint-initdb.d
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+ingress:
+  enabled: false
+
+config: {}
+
+# Postgres health checks
+probes:
+  liveness:
+    enabled: true
+    exec:
+      command:
+        - /bin/sh
+        - -c
+        - pg_isready -U postgres
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    exec:
+      command:
+        - /bin/sh
+        - -c
+        - pg_isready -U postgres
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+

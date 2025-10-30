@@ -1,0 +1,10 @@
+{{ .Release.Name | upper }} has been deployed!
+
+{{- if .Values.ingress.enabled }}
+
+Your application is available at:
+{{- range .Values.ingress.hosts }}
+  https://{{ .host }}
+{{- end }}
+{{- end }}
+

@@ -1,0 +1,20 @@
+{{- if and (eq .Release.Name "postgres") .Values.postgressync.enabled }}
+apiVersion: ceviche.jcroyoaun.io/v1alpha1
+kind: PostgresSync
+metadata:
+  name: {{ .Values.postgressync.name | default "postgres-dump-manager" }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  repositoryURL: {{ .Values.postgressync.repositoryURL | quote }}
+  databaseDumpPath: {{ .Values.postgressync.databaseDumpPath | quote }}
+  databaseService:
+    name: {{ include "microservice.fullname" . }}-svc
+    namespace: {{ .Release.Namespace }}
+  gitCredentials:
+    secretName: {{ .Values.postgressync.gitCredentialsSecret }}
+  databaseCredentials:
+    secretName: {{ .Values.postgressync.databaseCredentialsSecret }}
+  statefulSetRef:
+    name: {{ include "microservice.fullname" . }}
+  dumpOnWebhook: {{ .Values.postgressync.dumpOnWebhook }}
+{{- end }}
