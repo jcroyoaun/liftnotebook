@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: 443311183770.dkr.ecr.us-east-1.amazonaws.com/exerciselib
-  pullPolicy: IfNotPresent
+  pullPolicy: Always 
   tag: "latest"
 
 nameOverride: "exerciselib"
@@ -68,6 +68,9 @@ probes:
     periodSeconds: 5
     timeoutSeconds: 3
     failureThreshold: 3
+
+args:
+  - "-limiter-enabled=false"
 
 metrics:
   enabled: true
