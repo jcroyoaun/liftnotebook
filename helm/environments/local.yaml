@@ -1,5 +1,0 @@
-global:
-  environment: local
-  dbConnection: "k8s"
-  tag: latest
-
