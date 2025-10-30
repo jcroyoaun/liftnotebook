@@ -1,10 +1,10 @@
 locals {
   region = "us-east-1"
-  env    = "production"
+  env    = "dev"
 
   # DNS configuration
   dns = {
-    subdomain             = "liftnotebook"  # or whatever subdomain you want
+    subdomain             = "liftnotebook"
     parent_domain         = "jcroyoaun.com"
     parent_hosted_zone_id = "Z0018433153XTHTE2Z3K1"
   }
@@ -46,8 +46,8 @@ locals {
     
     node_group = {
       name           = "initial"
-      instance_types = ["t3.medium"]  # Adjust as needed
-      capacity_type  = "ON_DEMAND"    # or SPOT for cheaper
+      instance_types = ["t3.medium","t3.large","m6.medium","m6.large"]
+      capacity_type  = "SPOT"
       scaling_config = {
         desired_size = 2
         max_size     = 4
