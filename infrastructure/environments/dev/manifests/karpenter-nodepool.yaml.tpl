@@ -10,9 +10,18 @@ spec:
         kind: EC2NodeClass
         name: general-amd64
       requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]  # ← FORCE AMD64 ONLY
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
         - key: karpenter.sh/capacity-type
           operator: In
           values: ["spot"]
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["t", "m", "c"]
         - key: karpenter.k8s.aws/instance-generation
           operator: Gt
           values: ["5"]
