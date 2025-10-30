@@ -70,6 +70,7 @@ locals {
       "vpc-cni"                = "v1.19.2-eksbuild.1"
       "kube-proxy"             = "v1.32.0-eksbuild.2"
       "eks-pod-identity-agent" = "v1.3.4-eksbuild.1"
+      "aws-ebs-csi-driver"     = "v1.32.0-eksbuild.1"
     }
     
     helm_chart_versions = {
@@ -190,6 +191,10 @@ locals {
 
 
   k8s_manifests = {
+  storageclass_gp3 = { # <-- ADD THIS BLOCK
+        file_path = "${path.module}/manifests/storageclass-gp3.yaml"
+        vars      = {}
+      }
     karpenter_nodepool = {
       file_path = "${path.module}/manifests/karpenter-nodepool.yaml.tpl"
       vars = {

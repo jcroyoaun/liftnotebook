@@ -20,7 +20,7 @@ module "ecr" {
 
 # VPC Module
 module "vpc" {
-  source = "git::https://github.com/jcroyoaun/terraform-aws-modules.git//modules/vpc?ref=v1.0.0"
+  source = "git::https://github.com/jcroyoaun/terraform-aws-modules.git//modules/vpc?ref=v1.0.13"
 
   region                  = local.region
   vpc_cidr                = local.vpc.cidr
@@ -31,11 +31,14 @@ module "vpc" {
   create_isolated_subnets = local.vpc.create_isolated_subnets
   isolated_subnet_cidrs   = local.vpc.isolated_subnet_cidrs
   cluster_name            = local.eks.cluster_name
+  private_subnet_tags = {
+    "karpenter.sh/discovery" = local.eks.cluster_name
+  }
 }
 
 # EKS Module
 module "eks" {
-  source = "git::https://github.com/jcroyoaun/terraform-aws-modules.git//modules/eks?ref=v1.0.10"
+  source = "git::https://github.com/jcroyoaun/terraform-aws-modules.git//modules/eks?ref=v1.0.14"
 
   region              = local.region
   env                 = local.env
@@ -55,6 +58,8 @@ module "eks" {
   addon_versions      = local.eks.addon_versions
   helm_chart_versions = local.eks.helm_chart_versions
   
+  helm_charts = local.eks.helm_charts
+
   external_dns_domain_filters   = [module.dns.external_dns_domain_filter]
   external_dns_hosted_zone_arns = [module.dns.external_dns_hosted_zone_arn]
 
@@ -74,7 +79,7 @@ data "aws_eks_cluster_auth" "cluster" {
 
 
 module "k8s_manifests" {
-  source = "git::https://github.com/jcroyoaun/terraform-aws-modules.git//modules/k8s-manifests?ref=v1.0.10"
+  source = "git::https://github.com/jcroyoaun/terraform-aws-modules.git//modules/k8s-manifests?ref=v1.0.13"
 
   manifests = local.k8s_manifests
 
