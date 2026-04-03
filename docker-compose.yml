@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: liftnotebook
+      POSTGRES_PASSWORD: liftnotebook
+      POSTGRES_DB: liftnotebook
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./microservices/workouttracker/migrations/000001_init.up.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./dumps/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U liftnotebook"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  exerciselib:
+    build: ./microservices/exerciselib
+    command:
+      - "-port=4000"
+      - "-db-dsn=postgres://liftnotebook:liftnotebook@postgres:5432/liftnotebook?sslmode=disable"
+      - "-limiter-enabled=false"
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  workouttracker:
+    build: ./microservices/workouttracker
+    command:
+      - "-port=4001"
+      - "-db-dsn=postgres://liftnotebook:liftnotebook@postgres:5432/liftnotebook?sslmode=disable"
+      - "-jwt-secret=dev-secret-change-in-production"
+    ports:
+      - "4001:4001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  webapp:
+    build: ./microservices/webapp
+    ports:
+      - "3000:80"
+    depends_on:
+      - exerciselib
+      - workouttracker
+
+volumes:
+  postgres_data:

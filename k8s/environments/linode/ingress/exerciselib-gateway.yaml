@@ -1,0 +1,15 @@
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: exerciselib-gateway
+  namespace: exerciselib
+spec:
+  selector:
+    istio: ingress
+  servers:
+    - hosts:
+        - exerciselib.totalcomp.mx
+      port:
+        name: http
+        number: 80
+        protocol: HTTP

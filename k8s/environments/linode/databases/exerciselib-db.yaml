@@ -1,0 +1,22 @@
+apiVersion: acid.zalan.do/v1
+kind: postgresql
+metadata:
+  name: exerciselib-db
+  namespace: exerciselib
+spec:
+  teamId: exerciselib
+  numberOfInstances: 1
+  postgresql:
+    version: "15"
+  users:
+    exerciselib_app: []
+  databases:
+    exerciselib: exerciselib_app
+  patroni:
+    pg_hba:
+      - local   all             postgres                          trust
+      - local   replication     standby                           trust
+      - host    replication     standby         0.0.0.0/0         md5
+      - host    all             all             0.0.0.0/0         md5
+  volume:
+    size: 1Gi

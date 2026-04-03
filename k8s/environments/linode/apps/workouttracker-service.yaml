@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: workouttracker
+  namespace: liftnotebook
+spec:
+  selector:
+    app: workouttracker
+  ports:
+    - name: http
+      port: 4001
+      targetPort: http

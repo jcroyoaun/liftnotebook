@@ -70,3 +70,4 @@ charts/*.tgz
 # K8s
 kubeconfig
 **/kubeconfig
+k8s/.deploy-overlay.*

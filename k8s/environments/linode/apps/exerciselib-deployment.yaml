@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: exerciselib
+  namespace: exerciselib
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: exerciselib
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: exerciselib
+    spec:
+      containers:
+        - name: exerciselib
+          image: docker.io/jcroyoaun/exerciselib:latest
+          imagePullPolicy: Always
+          args:
+            - -env=production
+            - -port=4000
+            - -limiter-enabled=false
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: exerciselib-app.exerciselib-db.credentials.postgresql.acid.zalan.do
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: exerciselib-app.exerciselib-db.credentials.postgresql.acid.zalan.do
+                  key: password
+            - name: EXERCISELIB_DB_DSN
+              value: postgres://$(DB_USER):$(DB_PASSWORD)@exerciselib-db:5432/exerciselib?sslmode=disable
+          ports:
+            - name: http
+              containerPort: 4000
+          readinessProbe:
+            httpGet:
+              path: /v1/healthcheck
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /v1/healthcheck
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

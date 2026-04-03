@@ -1,0 +1,77 @@
+configTarget: OperatorConfigurationCRD
+
+configGeneral:
+  enable_crd_registration: true
+  crd_categories:
+    - all
+  enable_lazy_spilo_upgrade: false
+  enable_pgversion_env_var: true
+  enable_shm_volume: true
+  enable_spilo_wal_path_compat: false
+  enable_team_id_clustername_prefix: false
+  docker_image: ghcr.io/zalando/spilo-17:4.0-p2
+  min_instances: -1
+  max_instances: -1
+  repair_period: 5m
+  resync_period: 30m
+  workers: 8
+
+configUsers:
+  enable_password_rotation: false
+  password_rotation_interval: 90
+  password_rotation_user_retention: 180
+  replication_username: standby
+  super_username: postgres
+
+configMajorVersionUpgrade:
+  major_version_upgrade_mode: manual
+  minimal_major_version: "13"
+  target_major_version: "17"
+
+configKubernetes:
+  cluster_domain: cluster.local
+  cluster_labels:
+    application: spilo
+  cluster_name_label: cluster-name
+  enable_cross_namespace_secret: false
+  enable_finalizers: false
+  enable_init_containers: true
+  enable_owner_references: false
+  enable_persistent_volume_claim_deletion: true
+  enable_pod_antiaffinity: false
+  enable_pod_disruption_budget: true
+  enable_readiness_probe: false
+  enable_secrets_deletion: true
+  enable_sidecars: true
+  pdb_master_label_selector: true
+  pdb_name_format: postgres-{cluster}-pdb
+  persistent_volume_claim_retention_policy:
+    when_deleted: retain
+    when_scaled: retain
+  pod_antiaffinity_preferred_during_scheduling: false
+  pod_antiaffinity_topology_key: kubernetes.io/hostname
+  pod_management_policy: ordered_ready
+  pod_role_label: spilo-role
+  pod_terminate_grace_period: 5m
+  secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+  share_pgsocket_with_sidecars: false
+  spilo_allow_privilege_escalation: true
+  spilo_privileged: false
+  storage_resize_mode: pvc
+  watched_namespace: "*"
+
+configPostgresPodResources:
+  default_cpu_limit: "1"
+  default_cpu_request: 100m
+  default_memory_limit: 500Mi
+  default_memory_request: 100Mi
+  min_cpu_limit: 250m
+  min_memory_limit: 250Mi
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 500Mi
+  requests:
+    cpu: 100m
+    memory: 250Mi

@@ -1,0 +1,15 @@
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: liftnotebook-gateway
+  namespace: liftnotebook
+spec:
+  selector:
+    istio: ingress
+  servers:
+    - hosts:
+        - liftnotebook.totalcomp.mx
+      port:
+        name: http
+        number: 80
+        protocol: HTTP

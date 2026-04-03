@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workouttracker
+  namespace: liftnotebook
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: workouttracker
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: workouttracker
+    spec:
+      containers:
+        - name: workouttracker
+          image: docker.io/jcroyoaun/workouttracker:latest
+          imagePullPolicy: Always
+          args:
+            - -env=production
+            - -port=4001
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: liftnotebook-app.liftnotebook-db.credentials.postgresql.acid.zalan.do
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: liftnotebook-app.liftnotebook-db.credentials.postgresql.acid.zalan.do
+                  key: password
+            - name: WORKOUTTRACKER_DB_DSN
+              value: postgres://$(DB_USER):$(DB_PASSWORD)@liftnotebook-db:5432/liftnotebook?sslmode=disable
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: liftnotebook-app-secrets
+                  key: jwt-secret
+          ports:
+            - name: http
+              containerPort: 4001
+          readinessProbe:
+            httpGet:
+              path: /v1/healthcheck
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /v1/healthcheck
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

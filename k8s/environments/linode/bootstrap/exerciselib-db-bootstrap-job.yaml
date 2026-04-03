@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: exerciselib-db-bootstrap
+  namespace: exerciselib
+spec:
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      containers:
+        - name: psql
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_HOST
+              value: exerciselib-db
+            - name: DB_NAME
+              value: exerciselib
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: exerciselib-app.exerciselib-db.credentials.postgresql.acid.zalan.do
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: exerciselib-app.exerciselib-db.credentials.postgresql.acid.zalan.do
+                  key: password
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              until PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c 'select 1' >/dev/null 2>&1; do
+                sleep 2
+              done
+              PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -f /sql/schema.sql
+              PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -f /sql/seed.sql
+          volumeMounts:
+            - name: sql
+              mountPath: /sql
+              readOnly: true
+      volumes:
+        - name: sql
+          configMap:
+            name: exerciselib-db-bootstrap-sql
+            items:
+              - key: schema.sql
+                path: schema.sql
+              - key: seed.sql
+                path: seed.sql

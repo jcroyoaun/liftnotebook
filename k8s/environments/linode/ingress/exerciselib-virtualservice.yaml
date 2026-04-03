@@ -1,0 +1,16 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: exerciselib
+  namespace: exerciselib
+spec:
+  hosts:
+    - exerciselib.totalcomp.mx
+  gateways:
+    - exerciselib-gateway
+  http:
+    - route:
+        - destination:
+            host: exerciselib
+            port:
+              number: 4000

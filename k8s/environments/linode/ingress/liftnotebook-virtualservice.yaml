@@ -1,0 +1,16 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: liftnotebook
+  namespace: liftnotebook
+spec:
+  hosts:
+    - liftnotebook.totalcomp.mx
+  gateways:
+    - liftnotebook-gateway
+  http:
+    - route:
+        - destination:
+            host: webapp
+            port:
+              number: 80
