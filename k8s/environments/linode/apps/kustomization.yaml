@@ -4,6 +4,8 @@ kind: Kustomization
 resources:
   - exerciselib-service.yaml
   - exerciselib-deployment.yaml
+  - libconsole-service.yaml
+  - libconsole-deployment.yaml
   - workouttracker-service.yaml
   - workouttracker-deployment.yaml
   - webapp-service.yaml

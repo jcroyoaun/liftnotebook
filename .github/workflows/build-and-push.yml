@@ -1,188 +1,241 @@
-name: Build and Push to ECR
+name: Service CI and GHCR Publish
 
 on:
-  push:
+  pull_request:
     branches:
+      - main
       - master
     paths:
-      - 'microservices/**'
+      - ".github/workflows/build-and-push.yml"
+      - "microservices/**"
+      - "scripts/update-image-references.sh"
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - ".github/workflows/build-and-push.yml"
+      - "microservices/**"
+      - "scripts/update-image-references.sh"
   workflow_dispatch:
     inputs:
       service:
-        description: 'Service to build'
+        description: "Service to publish"
         required: true
+        default: "all"
         type: choice
         options:
           - all
           - exerciselib
-          - frontend
+          - libconsole
+          - workouttracker
+          - webapp
       tag:
-        description: 'Custom tag (optional, defaults to git SHA)'
+        description: "Optional image tag override"
         required: false
         type: string
 
+concurrency:
+  group: service-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
-  id-token: write
   contents: read
 
 env:
-  AWS_REGION: us-east-1
+  IMAGE_REGISTRY: ghcr.io
+  GHCR_NAMESPACE: ${{ vars.GHCR_NAMESPACE || github.repository_owner }}
+  DOCKER_METADATA_SHORT_SHA_LENGTH: 12
 
 jobs:
-  detect-changes:
+  go-unit-tests:
+    name: Go Unit Tests (${{ matrix.service.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - name: exerciselib
+            working_directory: microservices/exerciselib
+            go_version_file: microservices/exerciselib/go.mod
+            cache_dependency_path: microservices/exerciselib/go.sum
+          - name: workouttracker
+            working_directory: microservices/workouttracker
+            go_version_file: microservices/workouttracker/go.mod
+            cache_dependency_path: microservices/workouttracker/go.sum
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: ${{ matrix.service.go_version_file }}
+          cache-dependency-path: ${{ matrix.service.cache_dependency_path }}
+
+      - name: Run unit tests
+        working-directory: ${{ matrix.service.working_directory }}
+        run: go test ./...
+
+  webapp-unit-tests:
+    name: Webapp Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: microservices/webapp/package-lock.json
+
+      - name: Install dependencies
+        working-directory: microservices/webapp
+        run: npm ci
+
+      - name: Run unit tests
+        working-directory: microservices/webapp
+        run: npm run test:unit
+
+  prepare-publish-matrix:
+    name: Select Publish Targets
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
-      exerciselib: ${{ steps.filter.outputs.exerciselib }}
-      frontend: ${{ steps.filter.outputs.frontend }}
-      build_all: ${{ steps.check.outputs.build_all }}
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Check if manual trigger with 'all'
-        id: check
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ "${{ github.event.inputs.service }}" == "all" ]; then
-            echo "build_all=true" >> $GITHUB_OUTPUT
-          else
-            echo "build_all=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Detect changed services
-        id: filter
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            # Manual trigger
-            if [ "${{ github.event.inputs.service }}" == "exerciselib" ] || [ "${{ github.event.inputs.service }}" == "all" ]; then
-              echo "exerciselib=true" >> $GITHUB_OUTPUT
-            else
-              echo "exerciselib=false" >> $GITHUB_OUTPUT
-            fi
-            
-            if [ "${{ github.event.inputs.service }}" == "frontend" ] || [ "${{ github.event.inputs.service }}" == "all" ]; then
-              echo "frontend=true" >> $GITHUB_OUTPUT
-            else
-              echo "frontend=false" >> $GITHUB_OUTPUT
-            fi
-          else
-            # Push trigger - detect changes
-            if git diff --name-only HEAD^ HEAD | grep -q '^microservices/exerciselib/'; then
-              echo "exerciselib=true" >> $GITHUB_OUTPUT
-            else
-              echo "exerciselib=false" >> $GITHUB_OUTPUT
-            fi
-            
-            if git diff --name-only HEAD^ HEAD | grep -q '^microservices/frontend/'; then
-              echo "frontend=true" >> $GITHUB_OUTPUT
-            else
-              echo "frontend=false" >> $GITHUB_OUTPUT
-            fi
-          fi
-
-  build-exerciselib:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.exerciselib == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::443311183770:role/Github-Actions-Runner-OIDC
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Generate Image Tag
-        id: tag
-        run: |
-          if [ "${{ github.event.inputs.tag }}" != "" ]; then
-            TAG="${{ github.event.inputs.tag }}"
-          else
-            TAG=$(git rev-parse --short HEAD)
-          fi
-          echo "image_tag=${TAG}" >> $GITHUB_OUTPUT
-
-      - name: Build and Push exerciselib
-        working-directory: microservices/exerciselib
+      - name: Build publish matrix
+        id: set-matrix
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
+          EVENT_NAME: ${{ github.event_name }}
+          SELECTED_SERVICE: ${{ github.event.inputs.service }}
         run: |
-          echo "🐳 Building exerciselib..."
-          docker build -t $ECR_REGISTRY/exerciselib:$IMAGE_TAG .
-          docker tag $ECR_REGISTRY/exerciselib:$IMAGE_TAG $ECR_REGISTRY/exerciselib:latest
-          
-          echo "🚀 Pushing to ECR..."
-          docker push $ECR_REGISTRY/exerciselib:$IMAGE_TAG
-          docker push $ECR_REGISTRY/exerciselib:latest
-          
-          echo "✅ exerciselib pushed!"
-          echo "📦 $ECR_REGISTRY/exerciselib:$IMAGE_TAG"
-          echo "📦 $ECR_REGISTRY/exerciselib:latest"
+          full_matrix='[{"id":"exerciselib","image_name":"exerciselib","context":"microservices/exerciselib","dockerfile":"microservices/exerciselib/Dockerfile"},{"id":"libconsole","image_name":"libconsole","context":"microservices/frontend","dockerfile":"microservices/frontend/Dockerfile"},{"id":"workouttracker","image_name":"workouttracker","context":"microservices/workouttracker","dockerfile":"microservices/workouttracker/Dockerfile"},{"id":"webapp","image_name":"liftnotebook-webapp","context":"microservices/webapp","dockerfile":"microservices/webapp/Dockerfile"}]'
 
-  build-frontend:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.frontend == 'true'
+          case "${EVENT_NAME}:${SELECTED_SERVICE:-all}" in
+            push:*|workflow_dispatch:all|workflow_dispatch:)
+              matrix="${full_matrix}"
+              ;;
+            workflow_dispatch:exerciselib)
+              matrix='[{"id":"exerciselib","image_name":"exerciselib","context":"microservices/exerciselib","dockerfile":"microservices/exerciselib/Dockerfile"}]'
+              ;;
+            workflow_dispatch:libconsole)
+              matrix='[{"id":"libconsole","image_name":"libconsole","context":"microservices/frontend","dockerfile":"microservices/frontend/Dockerfile"}]'
+              ;;
+            workflow_dispatch:workouttracker)
+              matrix='[{"id":"workouttracker","image_name":"workouttracker","context":"microservices/workouttracker","dockerfile":"microservices/workouttracker/Dockerfile"}]'
+              ;;
+            workflow_dispatch:webapp)
+              matrix='[{"id":"webapp","image_name":"liftnotebook-webapp","context":"microservices/webapp","dockerfile":"microservices/webapp/Dockerfile"}]'
+              ;;
+            *)
+              echo "Unsupported publish target: ${SELECTED_SERVICE}" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
+
+  publish-images:
+    name: Publish Image (${{ matrix.service.id }})
+    needs:
+      - go-unit-tests
+      - webapp-unit-tests
+      - prepare-publish-matrix
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.prepare-publish-matrix.outputs.matrix) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::443311183770:role/Github-Actions-Runner-OIDC
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Generate Image Tag
-        id: tag
-        run: |
-          if [ "${{ github.event.inputs.tag }}" != "" ]; then
-            TAG="${{ github.event.inputs.tag }}"
-          else
-            TAG=$(git rev-parse --short HEAD)
-          fi
-          echo "image_tag=${TAG}" >> $GITHUB_OUTPUT
-
-      - name: Build and Push frontend
-        working-directory: microservices/frontend
+      - name: Normalize package namespace
+        id: registry
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
+          RAW_NAMESPACE: ${{ env.GHCR_NAMESPACE }}
         run: |
-          echo "🐳 Building frontend..."
-          docker build -t $ECR_REGISTRY/frontend:$IMAGE_TAG .
-          docker tag $ECR_REGISTRY/frontend:$IMAGE_TAG $ECR_REGISTRY/frontend:latest
-          
-          echo "🚀 Pushing to ECR..."
-          docker push $ECR_REGISTRY/frontend:$IMAGE_TAG
-          docker push $ECR_REGISTRY/frontend:latest
-          
-          echo "✅ frontend pushed!"
-          echo "📦 $ECR_REGISTRY/frontend:$IMAGE_TAG"
-          echo "📦 $ECR_REGISTRY/frontend:latest"
+          echo "namespace=$(printf '%s' "${RAW_NAMESPACE}" | tr '[:upper:]' '[:lower:]')" >> "${GITHUB_OUTPUT}"
 
-  summary:
-    needs: [detect-changes, build-exerciselib, build-frontend]
-    if: always()
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.IMAGE_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_REGISTRY }}/${{ steps.registry.outputs.namespace }}/${{ matrix.service.image_name }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref_name == github.event.repository.default_branch }}
+            type=raw,value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '' }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service.id }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.id }}
+
+  update-deployment-references:
+    name: Pin Deployment Images
+    needs:
+      - publish-images
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Build Summary
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Normalize package namespace
+        id: registry
+        env:
+          RAW_NAMESPACE: ${{ env.GHCR_NAMESPACE }}
         run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "🎉 Build Summary"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo ""
-          echo "exerciselib: ${{ needs.detect-changes.outputs.exerciselib }}"
-          echo "frontend: ${{ needs.detect-changes.outputs.frontend }}"
+          echo "namespace=$(printf '%s' "${RAW_NAMESPACE}" | tr '[:upper:]' '[:lower:]')" >> "${GITHUB_OUTPUT}"
+
+      - name: Update Kubernetes image references
+        env:
+          IMAGE_PREFIX: ${{ env.IMAGE_REGISTRY }}/${{ steps.registry.outputs.namespace }}
+        run: |
+          short_tag="sha-$(printf '%s' "${GITHUB_SHA}" | cut -c1-12)"
+          bash scripts/update-image-references.sh "${short_tag}" "${IMAGE_PREFIX}"
+
+      - name: Commit updated image references
+        run: |
+          if git diff --quiet -- k8s/environments/linode/apps; then
+            echo "No deployment image changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add k8s/environments/linode/apps
+          git commit -m "chore: pin deployment images to sha-${GITHUB_SHA::12} [skip ci]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

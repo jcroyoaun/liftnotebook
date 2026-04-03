@@ -9,8 +9,16 @@ spec:
   gateways:
     - exerciselib-gateway
   http:
-    - route:
+    - match:
+        - uri:
+            prefix: /v1/
+      route:
         - destination:
             host: exerciselib
             port:
               number: 4000
+    - route:
+        - destination:
+            host: libconsole
+            port:
+              number: 80

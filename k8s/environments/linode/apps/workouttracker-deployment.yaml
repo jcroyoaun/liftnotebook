@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: workouttracker
-          image: docker.io/jcroyoaun/workouttracker:latest
+          image: ghcr.io/jcroyoaun/workouttracker:latest
           imagePullPolicy: Always
           args:
             - -env=production

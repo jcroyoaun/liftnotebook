@@ -4,8 +4,13 @@ cluster.
 Key decisions:
 
 - `exerciselib` and `liftnotebook` each get their own namespace.
+- `libconsole` runs in the `exerciselib` namespace and serves the admin UI for the
+  exercise catalog.
 - `workouttracker` and `webapp` share the `liftnotebook` namespace so the webapp can
   keep using the in-cluster `workouttracker` service name from nginx.
+- The `exerciselib` host serves the UI at `/` and routes `/v1/*` to the API service.
+- App image references are pinned to immutable GHCR tags, and CI refreshes those
+  tags on merges to `main`/`master`.
 - `exerciselib` gets its own Postgres cluster.
 - `liftnotebook` gets its own Postgres cluster, but that database is still seeded with
   reference exercise data because `workouttracker` reads those tables directly.
@@ -16,7 +21,7 @@ Key decisions:
 - These workloads do not use Istio sidecars. The Linode cluster is currently two
   `g6-standard-1` nodes, and namespace-wide injection pushed the app pods into
   `Insufficient cpu` scheduling failures.
-- The three app Deployments use `Recreate` strategy and small CPU requests because the
+- The four app Deployments use `Recreate` strategy and small CPU requests because the
   cluster does not have enough spare requested CPU for surge-based one-replica rollouts.
 
 Deployment order:

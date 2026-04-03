@@ -3,7 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 KUBECONFIG_PATH="${KUBECONFIG_PATH:-${KUBECONFIG:-}}"
-DOCKER_REPO="${DOCKER_REPO:-jcroyoaun}"
+IMAGE_REGISTRY="${IMAGE_REGISTRY:-ghcr.io}"
+IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-${DOCKER_REPO:-jcroyoaun}}"
 IMAGE_TAG="${IMAGE_TAG:-$(date +%Y%m%d-%H%M%S)}"
 APP_HOST="${APP_HOST:-liftnotebook.totalcomp.mx}"
 EXERCISELIB_HOST="${EXERCISELIB_HOST:-exerciselib.totalcomp.mx}"
@@ -95,22 +96,38 @@ apply_bootstrap_jobs() {
 
 build_and_push_images() {
   docker buildx build --platform linux/amd64 --push \
-    -t "docker.io/${DOCKER_REPO}/exerciselib:${IMAGE_TAG}" \
+    -t "${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/exerciselib:${IMAGE_TAG}" \
     "${ROOT_DIR}/microservices/exerciselib"
 
   docker buildx build --platform linux/amd64 --push \
-    -t "docker.io/${DOCKER_REPO}/workouttracker:${IMAGE_TAG}" \
+    -t "${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/libconsole:${IMAGE_TAG}" \
+    "${ROOT_DIR}/microservices/frontend"
+
+  docker buildx build --platform linux/amd64 --push \
+    -t "${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/workouttracker:${IMAGE_TAG}" \
     "${ROOT_DIR}/microservices/workouttracker"
 
   docker buildx build --platform linux/amd64 --push \
-    -t "docker.io/${DOCKER_REPO}/liftnotebook-webapp:${IMAGE_TAG}" \
+    -t "${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/liftnotebook-webapp:${IMAGE_TAG}" \
     "${ROOT_DIR}/microservices/webapp"
 }
 
 apply_workloads() {
   local overlay_dir=""
+  local exerciselib_image_name=""
+  local libconsole_image_name=""
+  local workouttracker_image_name=""
+  local webapp_image_name=""
   overlay_dir="$(mktemp -d "${ROOT_DIR}/k8s/.deploy-overlay.XXXXXX")"
   trap 'rm -rf "${overlay_dir:-}"' EXIT
+  exerciselib_image_name="$(awk '/image:/{print $2; exit}' "${ROOT_DIR}/k8s/environments/linode/apps/exerciselib-deployment.yaml")"
+  libconsole_image_name="$(awk '/image:/{print $2; exit}' "${ROOT_DIR}/k8s/environments/linode/apps/libconsole-deployment.yaml")"
+  workouttracker_image_name="$(awk '/image:/{print $2; exit}' "${ROOT_DIR}/k8s/environments/linode/apps/workouttracker-deployment.yaml")"
+  webapp_image_name="$(awk '/image:/{print $2; exit}' "${ROOT_DIR}/k8s/environments/linode/apps/webapp-deployment.yaml")"
+  exerciselib_image_name="${exerciselib_image_name%:*}"
+  libconsole_image_name="${libconsole_image_name%:*}"
+  workouttracker_image_name="${workouttracker_image_name%:*}"
+  webapp_image_name="${webapp_image_name%:*}"
 
   cat > "${overlay_dir}/kustomization.yaml" <<EOF
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -119,14 +136,17 @@ resources:
   - ../environments/linode/apps
   - ../environments/linode/ingress
 images:
-  - name: docker.io/jcroyoaun/exerciselib
-    newName: docker.io/${DOCKER_REPO}/exerciselib
+  - name: ${exerciselib_image_name}
+    newName: ${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/exerciselib
     newTag: ${IMAGE_TAG}
-  - name: docker.io/jcroyoaun/workouttracker
-    newName: docker.io/${DOCKER_REPO}/workouttracker
+  - name: ${libconsole_image_name}
+    newName: ${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/libconsole
     newTag: ${IMAGE_TAG}
-  - name: docker.io/jcroyoaun/liftnotebook-webapp
-    newName: docker.io/${DOCKER_REPO}/liftnotebook-webapp
+  - name: ${workouttracker_image_name}
+    newName: ${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/workouttracker
+    newTag: ${IMAGE_TAG}
+  - name: ${webapp_image_name}
+    newName: ${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/liftnotebook-webapp
     newTag: ${IMAGE_TAG}
 patches:
   - target:
@@ -174,7 +194,9 @@ smoke_test() {
   fi
 
   curl --fail --silent --show-error -H "Host: ${EXERCISELIB_HOST}" "http://${ingress_host}/v1/healthcheck" >/dev/null
+  curl --fail --silent --show-error -H "Host: ${EXERCISELIB_HOST}" "http://${ingress_host}/" >/dev/null
   curl --fail --silent --show-error -H "Host: ${APP_HOST}" "http://${ingress_host}/v1/healthcheck" >/dev/null
+  curl --fail --silent --show-error -H "Host: ${APP_HOST}" "http://${ingress_host}/" >/dev/null
 
   echo "Smoke tests passed through ${ingress_host}" >&2
   echo "Create DNS records for ${APP_HOST} and ${EXERCISELIB_HOST} pointing at ${ingress_host}" >&2
@@ -212,6 +234,7 @@ apply_bootstrap_jobs
 apply_workloads
 
 kubectl --kubeconfig "${KUBECONFIG_PATH}" rollout status deployment/exerciselib -n exerciselib --timeout=300s
+kubectl --kubeconfig "${KUBECONFIG_PATH}" rollout status deployment/libconsole -n exerciselib --timeout=300s
 kubectl --kubeconfig "${KUBECONFIG_PATH}" rollout status deployment/workouttracker -n liftnotebook --timeout=300s
 kubectl --kubeconfig "${KUBECONFIG_PATH}" rollout status deployment/webapp -n liftnotebook --timeout=300s
 
