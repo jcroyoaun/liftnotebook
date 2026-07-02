@@ -5,7 +5,7 @@ export default function TopBar() {
     <header className="sticky top-0 z-40 border-b border-line bg-page/95 backdrop-blur">
       <div className="mx-auto flex h-13 max-w-2xl items-center justify-between px-5">
         <Link to="/" className="font-display text-[19px] font-bold text-ink">
-          Lift<span className="italic text-accent">Notebook</span>
+          Lift<span className="text-grad">Notebook</span>
         </Link>
         <Link
           to="/settings"

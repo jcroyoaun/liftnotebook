@@ -1,28 +1,28 @@
 // Chart tokens (validated palette — see dataviz method; run the validator
 // before adding categorical slots). Marks wear these; text wears text tokens.
-// Both modes validated against the Iron Ledger card surfaces
-// (#fffefb light / #201c19 dark): lightness band, chroma, CVD, contrast.
-// series2 is contrast-warned on light — only use with direct labels.
+// Both modes validated against the Cobalt card surfaces
+// (#ffffff light / #141a24 dark): lightness band, chroma, CVD, contrast —
+// all checks pass with no warnings in either mode.
 import { useTheme } from './themeContext'
 
 const light = {
-  series1: '#2a78d6', // blue — primary series / sequential hue
-  series2: '#1baf7a', // aqua — second series only (contrast-warned: needs labels)
-  good: '#008300',
-  grid: '#e7e2d9', // hairline, solid, recessive (warm paper neutral)
-  axisText: '#6d6660', // ink-3
-  ink: '#1c1917', // direct labels / headline figures
-  surface: '#fffefb',
+  series1: '#2563eb', // cobalt — primary series / sequential hue
+  series2: '#12996a', // green — second series only
+  good: '#0f7a3d',
+  grid: '#e4e8ee', // hairline, solid, recessive (cool slate neutral)
+  axisText: '#5b6574', // ink-3
+  ink: '#11151b', // direct labels / headline figures
+  surface: '#ffffff',
 }
 
 const dark = {
-  series1: '#3987e5', // same hues, stepped for the dark surface — not a flip
+  series1: '#4a80f2', // same hues, stepped for the dark surface — not a flip
   series2: '#199e70',
-  good: '#0ca30c',
-  grid: '#35302a',
-  axisText: '#948c80',
-  ink: '#ece7df',
-  surface: '#201c19',
+  good: '#3fbf74',
+  grid: '#242e3d',
+  axisText: '#8a94a8',
+  ink: '#eef1f6',
+  surface: '#141a24',
 }
 
 // Default export stays the light instance so non-reactive callers keep working.

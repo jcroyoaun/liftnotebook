@@ -4,7 +4,7 @@ import { ThemeContext } from './themeContext'
 // Theme = 'light' | 'dark' | 'system'. Applied as a .dark class on <html> so
 // the semantic tokens in index.css flip; also keeps the PWA chrome color in sync.
 const STORAGE_KEY = 'theme'
-const META_COLORS = { light: '#f6f4ef', dark: '#171412' }
+const META_COLORS = { light: '#f4f6f9', dark: '#0b0e14' }
 
 function subscribeSystem(cb) {
   const mq = window.matchMedia('(prefers-color-scheme: dark)')

@@ -31,7 +31,7 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-page px-5">
       <div className="w-full max-w-sm animate-rise">
         <h1 className="font-display mb-1 text-center text-[34px] font-bold text-ink">
-          Lift<span className="italic text-accent">Notebook</span>
+          Lift<span className="text-grad">Notebook</span>
         </h1>
         <p className="mb-8 text-center text-sm text-ink-3">Your training, written down</p>
         <form onSubmit={handleSubmit} className="space-y-4 rounded-card border border-line bg-card p-6 shadow-card">

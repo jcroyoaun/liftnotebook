@@ -23,8 +23,9 @@ are just different per-exercise target values.
 
 ## Webapp conventions
 
-- Design system = "Iron Ledger" (warm paper / midnight-ledger dark, oxblood
-  accent, Fraunces display face). ALL tokens live in `src/index.css`:
+- Design system = "Cobalt" (cool slate light / deep blue-black dark, electric
+  cobalt accent, Inter body + Space Grotesk display; `.text-grad` gradient is
+  wordmark-only). ALL tokens live in `src/index.css`:
   semantic classes only — `bg-page/card/raised/sunken`, `text-ink/-2/-3/-4`,
   `border-line/-2`, `text-accent`, `bg-accent-solid/-press`, `text-on-accent`,
   `bg-wash`, `text-ok/danger/warn` (+`-wash`), `rounded-card/btn/field/sheet`,
@@ -40,7 +41,7 @@ are just different per-exercise target values.
 - NEVER use browser `alert()`/`confirm()` — use `useToast()` from
   `src/lib/toastContext` and `ConfirmSheet`.
 - Loading states use `Skeleton`/`PageSkeleton`, never "Loading..." text.
-- Charts follow `src/lib/chartTheme.js` (validated palette: #2a78d6 primary,
+- Charts follow `src/lib/chartTheme.js` (validated palette: #2563eb primary,
   dark-surface steps included — re-run the dataviz validator before adding
   slots): solid 1px hairline grids, 2px lines, dots with surface ring, ≤24px
   bars with 4px rounded data-end, no legend for single series, endpoint direct

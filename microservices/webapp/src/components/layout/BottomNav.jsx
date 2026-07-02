@@ -36,23 +36,23 @@ export default function BottomNav() {
             to={tab.to}
             end={tab.to === '/'}
             className={({ isActive }) =>
-              `flex min-h-12 flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors active:scale-95 ${
-                isActive ? 'text-ink' : 'text-ink-3 hover:text-ink-2'
+              `flex min-h-12 flex-1 flex-col items-center gap-1 py-2 text-[11px] font-medium transition-colors active:scale-95 ${
+                isActive ? 'text-accent' : 'text-ink-3 hover:text-ink-2'
               }`
             }
           >
             {({ isActive }) => (
               <>
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  {tab.icon}
-                </svg>
-                {tab.label}
                 <span
-                  aria-hidden="true"
-                  className={`h-1 w-1 rounded-full transition-opacity ${
-                    isActive ? 'bg-accent opacity-100' : 'opacity-0'
+                  className={`grid h-7 w-14 place-items-center rounded-full transition-colors ${
+                    isActive ? 'bg-wash' : ''
                   }`}
-                />
+                >
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {tab.icon}
+                  </svg>
+                </span>
+                {tab.label}
               </>
             )}
           </NavLink>

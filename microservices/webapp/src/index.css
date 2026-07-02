@@ -1,11 +1,15 @@
 @import "tailwindcss";
-@import "@fontsource-variable/fraunces/opsz.css";
-@import "@fontsource-variable/fraunces/opsz-italic.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/space-grotesk";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ==========================================================================
-   Iron Ledger — the design system's single source of truth.
+   Cobalt — the design system's single source of truth.
+
+   Modern training-app language (MacroFactor's data polish × TrainWise's
+   dark athletic mode): cool slate surfaces, electric cobalt accent, Inter
+   for UI text, Space Grotesk for display type and big numerals.
 
    Raw values live on :root (light) and .dark; semantic utility classes are
    minted from them via @theme inline, so every token flips with the theme
@@ -16,74 +20,79 @@
    rounded-card/btn/field/sheet, shadow-card/raised/sheet, font-display.
    Stock Tailwind color scales are disabled below — a stray blue-600 will
    simply not compile. Chart colors live in src/lib/chartTheme.js only.
-   All text pairs computed ≥ 4.5:1 (see repo history: design-session audit).
+   All text pairs computed ≥ 4.5:1 in both modes (scripted audit — see repo
+   history: Cobalt redesign session).
    ========================================================================== */
 
 :root {
-  /* surfaces — warm paper */
-  --surface-page: #f6f4ef;
-  --surface-card: #fffefb;
+  /* surfaces — cool slate, cards float on a tinted page */
+  --surface-page: #f4f6f9;
+  --surface-card: #ffffff;
   --surface-raised: #ffffff;
-  --surface-sunken: #f0ede6;
+  --surface-sunken: #e9edf2;
   /* ink */
-  --ink-1: #1c1917;
-  --ink-2: #57534e;
-  --ink-3: #6d6660;
-  --ink-4: #a8a29e; /* decorative/placeholder only — below AA, never body text */
+  --ink-1: #11151b;
+  --ink-2: #454e5c;
+  --ink-3: #5b6574;
+  --ink-4: #98a2b3; /* decorative/placeholder only — below AA, never body text */
   /* hairlines */
-  --line-1: #e7e2d9;
-  --line-2: #d8d2c6;
-  /* accent — oxblood */
-  --accent-fg: #8c2b1f;    /* accent as text/icon */
-  --accent-solid: #8c2b1f; /* accent as fill */
-  --accent-press: #72211a;
+  --line-1: #e4e8ee;
+  --line-2: #d0d7e0;
+  /* accent — electric cobalt */
+  --accent-fg: #2158d8;    /* accent as text/icon */
+  --accent-solid: #2563eb; /* accent as fill */
+  --accent-press: #1d4ed8;
   --on-accent: #ffffff;
-  --wash: #f7ebe7;
+  --wash: #e7eefd;
   /* status */
-  --ok-fg: #3f6212;
-  --ok-wash: #eef3e3;
-  --danger-fg: #bf3226;
-  --danger-solid: #bf3226;
-  --danger-press: #a02a20;
-  --danger-wash: #faeae8;
-  --warn-fg: #92400e;
-  --warn-wash: #fdf3e3;
-  /* elevation — hairline + whisper of shadow; borders do the work */
-  --elev-card: 0 1px 2px rgba(28, 25, 23, 0.05);
-  --elev-raised: 0 4px 16px rgba(28, 25, 23, 0.1);
-  --elev-sheet: 0 -8px 32px rgba(28, 25, 23, 0.18);
+  --ok-fg: #0f7a3d;
+  --ok-wash: #e6f5ec;
+  --danger-fg: #cc2d21;
+  --danger-solid: #dc2626;
+  --danger-press: #b91c1c;
+  --danger-wash: #fdecea;
+  --warn-fg: #9a5306;
+  --warn-wash: #fbf3e4;
+  /* elevation — soft ambient shadow does the lifting; hairlines just define */
+  --elev-card: 0 1px 2px rgba(15, 23, 42, 0.05), 0 2px 8px rgba(15, 23, 42, 0.04);
+  --elev-raised: 0 6px 20px rgba(15, 23, 42, 0.1);
+  --elev-sheet: 0 -8px 32px rgba(15, 23, 42, 0.16);
+  /* display-only gradient (wordmark) — never a text-body treatment */
+  --grad-from: #2563eb;
+  --grad-to: #7c3aed;
 }
 
 .dark {
-  /* surfaces — midnight ledger, warm charcoal */
-  --surface-page: #171412;
-  --surface-card: #201c19;
-  --surface-raised: #292420;
-  --surface-sunken: #1b1815;
-  /* parchment ink */
-  --ink-1: #ece7df;
-  --ink-2: #b3aca1;
-  --ink-3: #948c80;
-  --ink-4: #6b6459;
-  --line-1: #35302a;
-  --line-2: #453e36;
-  /* oxblood, lifted for dark */
-  --accent-fg: #e08a76;
-  --accent-solid: #9c3a2b;
-  --accent-press: #b04635;
+  /* surfaces — deep blue-black, elevation = lightness steps */
+  --surface-page: #0b0e14;
+  --surface-card: #141a24;
+  --surface-raised: #1d2532;
+  --surface-sunken: #0f131b;
+  --ink-1: #eef1f6;
+  --ink-2: #a9b2c2;
+  --ink-3: #8a94a8;
+  --ink-4: #5b6579;
+  --line-1: #242e3d;
+  --line-2: #334054;
+  /* cobalt, lifted for dark */
+  --accent-fg: #7aa4fb;
+  --accent-solid: #2e6ceb;
+  --accent-press: #2257cf;
   --on-accent: #ffffff;
-  --wash: #2e211d;
-  --ok-fg: #8fbf6d;
-  --ok-wash: #222a1a;
-  --danger-fg: #e8796a;
-  --danger-solid: #bf3226;
-  --danger-press: #d0473a;
-  --danger-wash: #33201d;
-  --warn-fg: #e0a860;
-  --warn-wash: #2f2617;
-  --elev-card: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --elev-raised: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --elev-sheet: 0 -8px 32px rgba(0, 0, 0, 0.5);
+  --wash: #1a2740;
+  --ok-fg: #5ec584;
+  --ok-wash: #152b1e;
+  --danger-fg: #f37e72;
+  --danger-solid: #dc2626;
+  --danger-press: #c21d1d;
+  --danger-wash: #331d20;
+  --warn-fg: #e2a75c;
+  --warn-wash: #2e2415;
+  --elev-card: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --elev-raised: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --elev-sheet: 0 -8px 32px rgba(0, 0, 0, 0.55);
+  --grad-from: #7aa4fb;
+  --grad-to: #a78bfa;
 }
 
 @theme {
@@ -92,13 +101,13 @@
   --color-black: #000000;
   --color-white: #ffffff;
 
-  --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Oxygen', sans-serif;
+  --font-display: 'Space Grotesk Variable', 'Inter Variable', system-ui, sans-serif;
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-  --radius-card: 14px;
-  --radius-btn: 10px;
-  --radius-field: 10px;
-  --radius-sheet: 20px;
+  --radius-card: 16px;
+  --radius-btn: 12px;
+  --radius-field: 12px;
+  --radius-sheet: 24px;
 
   --animate-stamp: stamp 0.45s cubic-bezier(0.2, 1.4, 0.3, 1) both;
   --animate-rise: rise 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
@@ -162,10 +171,17 @@ body {
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-/* display face wants optical sizing + tight tracking at heading sizes */
+/* display face carries headings and hero numerals — tight, confident */
 .font-display {
-  font-optical-sizing: auto;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
+}
+
+/* wordmark-only gradient text; body copy never wears this */
+.text-grad {
+  background-image: linear-gradient(120deg, var(--grad-from), var(--grad-to));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
 }
 
 :focus-visible {
