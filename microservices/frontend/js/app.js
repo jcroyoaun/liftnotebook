@@ -13,7 +13,7 @@ function exerciseApp() {
         loadingExercises: false,
         modalOpen: false,
         currentExercise: null,
-        adminKey: localStorage.getItem('adminKey') || '',
+        authToken: localStorage.getItem('authToken') || '',
         
         // Data
         exercises: [],
@@ -187,31 +187,54 @@ function exerciseApp() {
             this.openModal(exercise);
         },
         
-        // Write endpoints require the admin API key (X-Admin-Key header).
-        ensureAdminKey() {
-            if (!this.adminKey) {
-                this.promptAdminKey();
+        // Write endpoints require an admin LiftNotebook account: the console
+        // logs in against the main API and sends the JWT; exerciselib
+        // verifies the shared-secret token and the admin role.
+        async ensureAuth() {
+            if (!this.authToken) {
+                await this.promptLogin();
             }
-            return this.adminKey;
+            return this.authToken;
         },
 
-        promptAdminKey() {
-            const key = prompt('Enter the admin API key:');
-            if (key) {
-                this.adminKey = key;
-                localStorage.setItem('adminKey', key);
+        async promptLogin() {
+            const email = prompt('LiftNotebook admin email:');
+            if (!email) return;
+            const password = prompt('Password:');
+            if (!password) return;
+
+            try {
+                const authBase = window.AUTH_API_BASE || 'https://liftnotebook.totalcomp.mx';
+                const response = await fetch(`${authBase}/v1/users/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password }),
+                });
+                if (!response.ok) {
+                    throw new Error('Login failed — check email and password.');
+                }
+                const data = await response.json();
+                if (data.user?.role !== 'admin') {
+                    throw new Error('This account is not an admin.');
+                }
+                this.authToken = data.token;
+                localStorage.setItem('authToken', data.token);
+                this.showSuccess(`Signed in as ${data.user.name}`);
+            } catch (error) {
+                console.error('Login error:', error);
+                this.showError(error.message);
             }
         },
 
         handleUnauthorized() {
-            this.adminKey = '';
-            localStorage.removeItem('adminKey');
-            this.showError('Admin key rejected. Click the key icon to set it and try again.');
+            this.authToken = '';
+            localStorage.removeItem('authToken');
+            this.showError('Session expired or not authorized. Click the key icon to sign in again.');
         },
 
         async saveExercise() {
             try {
-                if (!this.ensureAdminKey()) return;
+                if (!(await this.ensureAuth())) return;
 
                 const url = this.currentExercise
                     ? `/v1/exercises/${this.currentExercise.id}`
@@ -231,12 +254,12 @@ function exerciseApp() {
                     method: method,
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-Admin-Key': this.adminKey
+                        'Authorization': `Bearer ${this.authToken}`
                     },
                     body: JSON.stringify(payload)
                 });
 
-                if (response.status === 401) {
+                if (response.status === 401 || response.status === 403) {
                     this.handleUnauthorized();
                     return;
                 }
@@ -262,16 +285,16 @@ function exerciseApp() {
             if (!confirm('Are you sure you want to delete this exercise?')) return;
 
             try {
-                if (!this.ensureAdminKey()) return;
+                if (!(await this.ensureAuth())) return;
 
                 const response = await fetch(`/v1/exercises/${id}`, {
                     method: 'DELETE',
                     headers: {
-                        'X-Admin-Key': this.adminKey
+                        'Authorization': `Bearer ${this.authToken}`
                     }
                 });
 
-                if (response.status === 401) {
+                if (response.status === 401 || response.status === 403) {
                     this.handleUnauthorized();
                     return;
                 }

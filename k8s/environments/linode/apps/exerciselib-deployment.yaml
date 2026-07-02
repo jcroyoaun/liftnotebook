@@ -43,6 +43,12 @@ spec:
                 secretKeyRef:
                   name: exerciselib-app-secrets
                   key: admin-api-key
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: exerciselib-app-secrets
+                  key: jwt-secret
+                  optional: true
           ports:
             - name: http
               containerPort: 4000

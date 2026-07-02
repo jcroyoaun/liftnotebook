@@ -21,7 +21,10 @@ ON CONFLICT (id) DO NOTHING;
 
 SELECT setval('movement_patterns_id_seq', 17, true);
 
--- Muscles
+-- Muscles. The adductors body part postdates the enum's creation in older
+-- schemas; adding it here keeps this seed runnable against any of them.
+ALTER TYPE body_part_enum ADD VALUE IF NOT EXISTS 'adductors';
+
 INSERT INTO muscles (id, name, body_part) VALUES
 (1, 'Pectoralis Major', 'chest'),
 (2, 'Pectoralis Minor', 'chest'),
@@ -49,10 +52,11 @@ INSERT INTO muscles (id, name, body_part) VALUES
 (24, 'Rectus Abdominis', 'core'),
 (25, 'Obliques', 'core'),
 (26, 'Transverse Abdominis', 'core'),
-(27, 'Forearm Flexors & Extensors', 'forearms')
+(27, 'Forearm Flexors & Extensors', 'forearms'),
+(28, 'Hip Adductors', 'adductors')
 ON CONFLICT (id) DO NOTHING;
 
-SELECT setval('muscles_id_seq', 27, true);
+SELECT setval('muscles_id_seq', 28, true);
 
 -- Exercises
 INSERT INTO exercises (id, name, type, movement_pattern_id) VALUES
@@ -98,10 +102,26 @@ INSERT INTO exercises (id, name, type, movement_pattern_id) VALUES
 (40, 'T-Bar Row', 'compound', 8),
 (41, 'Hammer Curls', 'isolation', 14),
 (42, 'Weighted Chin-up', 'compound', 6),
-(43, 'SSB Bulgarian Split Squat (Front Foot Heel Elevated)', 'compound', 17)
+(43, 'SSB Bulgarian Split Squat (Front Foot Heel Elevated)', 'compound', 17),
+(44, 'Machine Deadlift', 'compound', 3),
+(45, 'Machine Hip Press', 'compound', 2),
+(46, 'Pendulum Squat', 'compound', 2),
+(47, 'Seated Leg Curl', 'isolation', 14),
+(48, 'Machine Back Extension', 'compound', 4),
+(49, 'Single Leg Leg Press', 'compound', 17),
+(50, 'Machine Pullover', 'isolation', 11),
+(51, 'T-Bar Kelso Shrug', 'isolation', 16),
+(52, 'Incline Bench Cable Tricep Extension', 'isolation', 14),
+(53, 'Incline Bench Cable Overhead Tricep Extension', 'isolation', 14),
+(54, 'Bayesian Cable Curl', 'isolation', 14),
+(55, 'Seated Bayesian Cable Curl', 'isolation', 14),
+(56, 'Incline Bench Cable Pullover', 'isolation', 11),
+(57, 'Standing Cable Pullover', 'isolation', 11),
+(58, 'Single Leg Leg Extension', 'isolation', 14),
+(59, 'Single Leg Leg Curl', 'isolation', 14)
 ON CONFLICT (id) DO NOTHING;
 
-SELECT setval('exercises_id_seq', 43, true);
+SELECT setval('exercises_id_seq', 59, true);
 
 -- Exercise-muscle relationships
 INSERT INTO exercise_muscles (exercise_id, muscle_id, target_type) VALUES
@@ -145,6 +165,9 @@ INSERT INTO exercise_muscles (exercise_id, muscle_id, target_type) VALUES
 -- Hip Thrust
 (14, 21, 'primary'),
 (14, 17, 'secondary'),
+-- Dumbbell Pullover
+(15, 3, 'primary'),
+(15, 1, 'secondary'), (15, 12, 'secondary'),
 -- Dumbbell Fly
 (16, 1, 'primary'),
 (16, 8, 'secondary'),
@@ -162,6 +185,8 @@ INSERT INTO exercise_muscles (exercise_id, muscle_id, target_type) VALUES
 (21, 12, 'primary'),
 -- Split Squat
 (22, 14, 'primary'), (22, 21, 'primary'),
+-- Hip Abductor Machine
+(23, 20, 'primary'), (23, 22, 'primary'),
 -- Leg Extension
 (24, 14, 'primary'), (24, 15, 'primary'), (24, 16, 'primary'),
 -- Lying Leg Curl
@@ -176,7 +201,7 @@ INSERT INTO exercise_muscles (exercise_id, muscle_id, target_type) VALUES
 (28, 14, 'primary'), (28, 15, 'primary'), (28, 16, 'primary'),
 (28, 21, 'secondary'),
 -- Hip Adduction Machine
-(29, 20, 'primary'), (29, 22, 'primary'),
+(29, 28, 'primary'),
 -- Glute Ham Raise
 (30, 17, 'primary'), (30, 18, 'primary'), (30, 19, 'primary'),
 (30, 21, 'secondary'),
@@ -212,5 +237,48 @@ INSERT INTO exercise_muscles (exercise_id, muscle_id, target_type) VALUES
 (42, 3, 'primary'), (42, 11, 'primary'),
 -- SSB Bulgarian Split Squat (Front Foot Heel Elevated)
 (43, 14, 'primary'), (43, 15, 'primary'), (43, 16, 'primary'), (43, 21, 'primary'),
-(43, 17, 'secondary'), (43, 7, 'secondary')
+(43, 17, 'secondary'), (43, 7, 'secondary'),
+-- Machine Deadlift
+(44, 21, 'primary'), (44, 17, 'primary'), (44, 7, 'primary'),
+(44, 3, 'secondary'), (44, 5, 'secondary'),
+-- Machine Hip Press
+(45, 21, 'primary'),
+(45, 14, 'secondary'), (45, 15, 'secondary'), (45, 16, 'secondary'), (45, 17, 'secondary'),
+-- Pendulum Squat
+(46, 14, 'primary'), (46, 15, 'primary'), (46, 16, 'primary'),
+(46, 21, 'secondary'),
+-- Seated Leg Curl
+(47, 17, 'primary'), (47, 18, 'primary'), (47, 19, 'primary'),
+-- Machine Back Extension
+(48, 7, 'primary'), (48, 21, 'primary'),
+(48, 17, 'secondary'), (48, 18, 'secondary'), (48, 19, 'secondary'),
+-- Single Leg Leg Press
+(49, 14, 'primary'), (49, 15, 'primary'), (49, 16, 'primary'), (49, 21, 'primary'),
+(49, 17, 'secondary'),
+-- Machine Pullover
+(50, 3, 'primary'),
+(50, 1, 'secondary'), (50, 12, 'secondary'),
+-- T-Bar Kelso Shrug
+(51, 5, 'primary'), (51, 4, 'primary'),
+(51, 6, 'secondary'),
+-- Incline Bench Cable Tricep Extension
+(52, 12, 'primary'),
+-- Incline Bench Cable Overhead Tricep Extension
+(53, 12, 'primary'),
+-- Bayesian Cable Curl
+(54, 11, 'primary'),
+(54, 13, 'secondary'),
+-- Seated Bayesian Cable Curl
+(55, 11, 'primary'),
+(55, 13, 'secondary'),
+-- Incline Bench Cable Pullover
+(56, 3, 'primary'),
+(56, 1, 'secondary'), (56, 12, 'secondary'),
+-- Standing Cable Pullover
+(57, 3, 'primary'),
+(57, 1, 'secondary'), (57, 12, 'secondary'),
+-- Single Leg Leg Extension
+(58, 14, 'primary'), (58, 15, 'primary'), (58, 16, 'primary'),
+-- Single Leg Leg Curl
+(59, 17, 'primary'), (59, 18, 'primary'), (59, 19, 'primary')
 ON CONFLICT (exercise_id, muscle_id) DO NOTHING;

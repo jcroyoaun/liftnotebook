@@ -41,6 +41,10 @@ type config struct {
 	// adminAPIKey guards all mutating endpoints. When empty, writes are
 	// rejected outright (fail closed) rather than left open.
 	adminAPIKey string
+	// jwtSecret verifies workouttracker-issued user tokens (shared secret);
+	// tokens carrying role=admin may use the mutating endpoints, so catalog
+	// admin rides the same user hierarchy as the main app.
+	jwtSecret string
 }
 
 type application struct {
@@ -69,6 +73,7 @@ func main() {
 	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
 
 	flag.StringVar(&cfg.adminAPIKey, "admin-api-key", os.Getenv("ADMIN_API_KEY"), "Admin API key required for write endpoints")
+	flag.StringVar(&cfg.jwtSecret, "jwt-secret", os.Getenv("JWT_SECRET"), "Shared JWT secret for validating workouttracker admin tokens")
 
 	flag.Parse()
 

@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import CreateMesocycle from './pages/CreateMesocycle'
 import SetupDayExercises from './pages/SetupDayExercises'
 import Workout from './features/workout/WorkoutSession'
+import SessionDetail from './pages/SessionDetail'
 import Progress from './pages/Progress'
 import Volume from './pages/Volume'
 import MesocycleHistory from './pages/MesocycleHistory'
@@ -38,6 +39,8 @@ export default function App() {
         <Route path="/programs/:id/setup/:dayId" element={<SetupDayExercises />} />
         <Route path="/programs/:id/volume" element={<Volume />} />
         <Route path="/programs/history" element={<MesocycleHistory />} />
+        {/* Read-only view of a logged workout; editing stays in /workout */}
+        <Route path="/sessions/:id" element={<SessionDetail />} />
         <Route path="/progress" element={<Progress />} />
         <Route path="/settings" element={<Settings />} />
       </Route>

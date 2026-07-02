@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -36,6 +37,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		Name:      input.Name,
 		Email:     input.Email,
 		Activated: true,
+		Role:      app.roleForEmail(input.Email),
 	}
 
 	err = user.Password.Set(input.Password)
@@ -63,7 +65,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Generate JWT for the newly registered user
-	token, err := app.generateJWT(user.ID, user.Email)
+	token, err := app.generateJWT(user.ID, user.Email, user.Role)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -119,7 +121,7 @@ func (app *application) loginUserHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	token, err := app.generateJWT(user.ID, user.Email)
+	token, err := app.generateJWT(user.ID, user.Email, user.Role)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -134,14 +136,29 @@ func (app *application) loginUserHandler(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-func (app *application) generateJWT(userID int64, email string) (string, error) {
+func (app *application) generateJWT(userID int64, email string, role string) (string, error) {
+	if role == "" {
+		role = "user"
+	}
 	claims := jwt.MapClaims{
 		"user_id": userID,
 		"email":   email,
+		"role":    role,
 		"exp":     time.Now().Add(72 * time.Hour).Unix(),
 		"iat":     time.Now().Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(app.config.jwt.secret))
+}
+
+// roleForEmail resolves a registration email against the configured admin
+// list — this is the only path to the admin role besides startup promotion.
+func (app *application) roleForEmail(email string) string {
+	for _, admin := range app.config.adminEmails {
+		if strings.EqualFold(strings.TrimSpace(admin), email) {
+			return "admin"
+		}
+	}
+	return "user"
 }

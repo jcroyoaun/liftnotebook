@@ -6,9 +6,10 @@ import (
 	"flag"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 	"workouttracker.jcroyoaun.io/internal/data"
 	"workouttracker.jcroyoaun.io/migrations"
 )
@@ -31,6 +32,10 @@ type config struct {
 	// development), registration is open; when set, /v1/users/register
 	// requires a matching invite_code in the request body.
 	inviteCode string
+	// adminEmails lists accounts holding the admin role (exercise-catalog
+	// writes). Promotion runs at startup and on registration; there is no
+	// in-app path to admin.
+	adminEmails []string
 }
 
 type application struct {
@@ -50,10 +55,17 @@ func main() {
 	flag.DurationVar(&cfg.db.maxIdleTime, "db-max-idle-time", 15*time.Minute, "PostgreSQL max connection idle time")
 	flag.StringVar(&cfg.jwt.secret, "jwt-secret", os.Getenv("JWT_SECRET"), "JWT signing secret")
 	flag.StringVar(&cfg.inviteCode, "invite-code", os.Getenv("INVITE_CODE"), "Invite code required for registration (empty = open registration)")
+	adminEmailsRaw := flag.String("admin-emails", os.Getenv("ADMIN_EMAILS"), "Comma-separated emails promoted to the admin role at startup")
 
 	migrateOnly := flag.Bool("migrate-only", false, "Run database migrations and exit")
 
 	flag.Parse()
+
+	for _, e := range strings.Split(*adminEmailsRaw, ",") {
+		if e = strings.TrimSpace(e); e != "" {
+			cfg.adminEmails = append(cfg.adminEmails, e)
+		}
+	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
@@ -73,6 +85,22 @@ func main() {
 	}
 	logger.Info("database migrations applied")
 
+	// Promote configured admin accounts (existing users; new ones get the
+	// role at registration). Promotion only — never demotes.
+	if len(cfg.adminEmails) > 0 {
+		res, err := db.Exec(
+			`UPDATE users SET role = 'admin' WHERE lower(email) = ANY($1) AND role <> 'admin'`,
+			pq.Array(lowerAll(cfg.adminEmails)),
+		)
+		if err != nil {
+			logger.Error("admin promotion failed", "error", err.Error())
+			os.Exit(1)
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
+			logger.Info("promoted admin users", "count", n)
+		}
+	}
+
 	if *migrateOnly {
 		return
 	}
@@ -88,6 +116,14 @@ func main() {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
+}
+
+func lowerAll(ss []string) []string {
+	out := make([]string, len(ss))
+	for i, s := range ss {
+		out[i] = strings.ToLower(s)
+	}
+	return out
 }
 
 func openDB(cfg config) (*sql.DB, error) {

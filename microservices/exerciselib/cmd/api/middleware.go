@@ -5,9 +5,11 @@ import (
 	"crypto/subtle"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/tomasen/realip"
 	"golang.org/x/time/rate"
 )
@@ -54,19 +56,52 @@ func (app *application) metrics(next http.HandlerFunc, path string) http.Handler
 	}
 }
 
-// requireAdminKey restricts a handler to requests carrying the correct
-// X-Admin-Key header. If no admin key is configured on the server, guarded
-// endpoints fail closed with a 503 instead of being left unauthenticated.
-func (app *application) requireAdminKey(next http.HandlerFunc) http.HandlerFunc {
+// requireAdmin restricts a handler to catalog admins. The primary path is a
+// workouttracker-issued JWT (shared secret) carrying role=admin — the same
+// user hierarchy as the main app. X-Admin-Key remains as a break-glass
+// fallback for automation. With neither secret configured, writes fail
+// closed with a 503 instead of being left unauthenticated.
+func (app *application) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if app.config.adminAPIKey == "" {
-			app.errorResponse(w, r, http.StatusServiceUnavailable, "admin API key is not configured on the server")
+		if app.config.adminAPIKey == "" && app.config.jwtSecret == "" {
+			app.errorResponse(w, r, http.StatusServiceUnavailable, "no admin credentials are configured on the server")
 			return
 		}
 
-		key := r.Header.Get("X-Admin-Key")
-		if subtle.ConstantTimeCompare([]byte(key), []byte(app.config.adminAPIKey)) != 1 {
+		if key := r.Header.Get("X-Admin-Key"); key != "" && app.config.adminAPIKey != "" {
+			if subtle.ConstantTimeCompare([]byte(key), []byte(app.config.adminAPIKey)) == 1 {
+				next.ServeHTTP(w, r)
+				return
+			}
 			app.invalidAdminKeyResponse(w, r)
+			return
+		}
+
+		if app.config.jwtSecret == "" {
+			app.invalidAdminKeyResponse(w, r)
+			return
+		}
+		authHeader := r.Header.Get("Authorization")
+		tokenString, ok := strings.CutPrefix(authHeader, "Bearer ")
+		if !ok || tokenString == "" {
+			app.errorResponse(w, r, http.StatusUnauthorized, "admin authentication required")
+			return
+		}
+
+		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (any, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			}
+			return []byte(app.config.jwtSecret), nil
+		})
+		if err != nil || !token.Valid {
+			app.errorResponse(w, r, http.StatusUnauthorized, "invalid or expired token")
+			return
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok || claims["role"] != "admin" {
+			app.errorResponse(w, r, http.StatusForbidden, "admin role required")
 			return
 		}
 

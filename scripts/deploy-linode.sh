@@ -81,6 +81,7 @@ ensure_bootstrap_configmaps() {
 ensure_liftnotebook_secret() {
   local jwt_secret="${LIFTNOTEBOOK_JWT_SECRET:-}"
   local invite_code="${LIFTNOTEBOOK_INVITE_CODE:-}"
+  local admin_emails="${LIFTNOTEBOOK_ADMIN_EMAILS:-}"
 
   # Reuse values from an existing secret for anything not supplied explicitly,
   # so redeploys never rotate credentials by accident.
@@ -90,6 +91,9 @@ ensure_liftnotebook_secret() {
     fi
     if [[ -z "${invite_code}" ]]; then
       invite_code="$(kubectl --kubeconfig "${KUBECONFIG_PATH}" -n liftnotebook get secret liftnotebook-app-secrets -o jsonpath='{.data.invite-code}' | base64 -d || true)"
+    fi
+    if [[ -z "${admin_emails}" ]]; then
+      admin_emails="$(kubectl --kubeconfig "${KUBECONFIG_PATH}" -n liftnotebook get secret liftnotebook-app-secrets -o jsonpath='{.data.admin-emails}' | base64 -d || true)"
     fi
   fi
 
@@ -104,27 +108,39 @@ ensure_liftnotebook_secret() {
     echo "retrieve it with: kubectl -n liftnotebook get secret liftnotebook-app-secrets -o jsonpath='{.data.invite-code}' | base64 -d" >&2
   fi
 
+  if [[ -z "${admin_emails}" ]]; then
+    echo "no admin emails configured; set LIFTNOTEBOOK_ADMIN_EMAILS (comma-separated) to grant the admin role for exercise-console writes" >&2
+  fi
+
   kubectl --kubeconfig "${KUBECONFIG_PATH}" -n liftnotebook create secret generic liftnotebook-app-secrets \
     --from-literal=jwt-secret="${jwt_secret}" \
     --from-literal=invite-code="${invite_code}" \
+    --from-literal=admin-emails="${admin_emails}" \
     --dry-run=client -o yaml | kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f -
 }
 
 ensure_exerciselib_secret() {
   local admin_api_key="${EXERCISELIB_ADMIN_API_KEY:-}"
-  if [[ -z "${admin_api_key}" ]]; then
-    if kubectl --kubeconfig "${KUBECONFIG_PATH}" get secret exerciselib-app-secrets -n exerciselib >/dev/null 2>&1; then
-      echo "reusing existing exerciselib-app-secrets secret" >&2
-      return 0
-    fi
 
+  if [[ -z "${admin_api_key}" ]] && kubectl --kubeconfig "${KUBECONFIG_PATH}" get secret exerciselib-app-secrets -n exerciselib >/dev/null 2>&1; then
+    admin_api_key="$(kubectl --kubeconfig "${KUBECONFIG_PATH}" -n exerciselib get secret exerciselib-app-secrets -o jsonpath='{.data.admin-api-key}' | base64 -d || true)"
+  fi
+
+  if [[ -z "${admin_api_key}" ]]; then
     admin_api_key="$(openssl rand -hex 32)"
     echo "generated new admin API key for exerciselib-app-secrets" >&2
     echo "retrieve it later with: kubectl -n exerciselib get secret exerciselib-app-secrets -o jsonpath='{.data.admin-api-key}' | base64 -d" >&2
   fi
 
+  # Console admins sign in with workouttracker-issued JWTs, so exerciselib
+  # needs the same signing secret; namespaces don't share secrets, so mirror
+  # the value (requires ensure_liftnotebook_secret to have run first).
+  local jwt_secret
+  jwt_secret="$(kubectl --kubeconfig "${KUBECONFIG_PATH}" -n liftnotebook get secret liftnotebook-app-secrets -o jsonpath='{.data.jwt-secret}' | base64 -d)"
+
   kubectl --kubeconfig "${KUBECONFIG_PATH}" -n exerciselib create secret generic exerciselib-app-secrets \
     --from-literal=admin-api-key="${admin_api_key}" \
+    --from-literal=jwt-secret="${jwt_secret}" \
     --dry-run=client -o yaml | kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f -
 }
 

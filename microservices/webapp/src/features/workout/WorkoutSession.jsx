@@ -72,6 +72,12 @@ export default function WorkoutSession() {
     navigate('/')
   }
 
+  // Minimize (not close): the session and rest timer stay live, and the
+  // ActiveWorkoutBar mini-bar keeps it one tap away from every tab.
+  function minimize() {
+    navigate('/')
+  }
+
   if (session.isError) {
     return <div className="py-12 text-center text-danger">Could not load session.</div>
   }
@@ -117,11 +123,23 @@ export default function WorkoutSession() {
   return (
     <div className="space-y-4 pb-20">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-display text-[24px] font-semibold leading-tight text-ink">{meta?.day_label}</h2>
-          <p className="text-xs text-ink-3">
-            {meta?.performed_at && new Date(meta.performed_at).toLocaleDateString()}
-          </p>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <button
+            onClick={minimize}
+            aria-label="Minimize workout"
+            title="Minimize — keeps the workout going"
+            className="-ml-2.5 grid h-11 w-11 shrink-0 place-items-center rounded-full text-ink-3 transition-colors hover:bg-sunken hover:text-ink active:scale-95"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <div className="min-w-0">
+            <h2 className="font-display truncate text-[24px] font-semibold leading-tight text-ink">{meta?.day_label}</h2>
+            <p className="text-xs text-ink-3">
+              {meta?.performed_at && new Date(meta.performed_at).toLocaleDateString()}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {(!online || pendingSets.length > 0) && (

@@ -19,6 +19,7 @@ type User struct {
 	Email     string    `json:"email"`
 	Password  Password  `json:"-"`
 	Activated bool      `json:"activated"`
+	Role      string    `json:"role"`
 	Version   int       `json:"-"`
 }
 
@@ -78,12 +79,16 @@ func ValidateUser(v *validator.Validator, user *User) {
 }
 
 func (m UserModel) Insert(user *User) error {
+	if user.Role == "" {
+		user.Role = "user"
+	}
+
 	query := `
-		INSERT INTO users (name, email, password_hash, activated)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO users (name, email, password_hash, activated, role)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, created_at, version`
 
-	args := []any{user.Name, user.Email, user.Password.Hash, user.Activated}
+	args := []any{user.Name, user.Email, user.Password.Hash, user.Activated, user.Role}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -102,7 +107,7 @@ func (m UserModel) Insert(user *User) error {
 
 func (m UserModel) GetByEmail(email string) (*User, error) {
 	query := `
-		SELECT id, created_at, name, email, password_hash, activated, version
+		SELECT id, created_at, name, email, password_hash, activated, role, version
 		FROM users
 		WHERE email = $1`
 
@@ -113,7 +118,7 @@ func (m UserModel) GetByEmail(email string) (*User, error) {
 
 	err := m.DB.QueryRowContext(ctx, query, email).Scan(
 		&user.ID, &user.CreatedAt, &user.Name, &user.Email,
-		&user.Password.Hash, &user.Activated, &user.Version,
+		&user.Password.Hash, &user.Activated, &user.Role, &user.Version,
 	)
 	if err != nil {
 		switch {
@@ -128,7 +133,7 @@ func (m UserModel) GetByEmail(email string) (*User, error) {
 
 func (m UserModel) GetByID(id int64) (*User, error) {
 	query := `
-		SELECT id, created_at, name, email, password_hash, activated, version
+		SELECT id, created_at, name, email, password_hash, activated, role, version
 		FROM users
 		WHERE id = $1`
 
@@ -139,7 +144,7 @@ func (m UserModel) GetByID(id int64) (*User, error) {
 
 	err := m.DB.QueryRowContext(ctx, query, id).Scan(
 		&user.ID, &user.CreatedAt, &user.Name, &user.Email,
-		&user.Password.Hash, &user.Activated, &user.Version,
+		&user.Password.Hash, &user.Activated, &user.Role, &user.Version,
 	)
 	if err != nil {
 		switch {

@@ -55,7 +55,11 @@ are just different per-exercise target values.
 - House philosophy in UI copy: sets + "to failure" — never surface rep-range
   prescriptions (the target_rep_range columns are inert defaults).
 - Mobile-first: bottom tab bar (Today / Programs / Progress), FocusLayout for
-  active workouts, safe-area padding.
+  active workouts, safe-area padding. An in-progress workout is minimizable
+  (chevron in the logger header) — `ActiveWorkoutBar` docks a persistent
+  mini-bar above the tab bar until Finish. `/sessions/:id` is the read-only
+  view of a logged workout; `/workout/:id` is the only editable surface.
+  Dashboard days always render in program order (badge moves, cards don't).
 - E2E locators are copy-based — keep visible copy stable or update
   `e2e/*.spec.js` in the same commit.
 
@@ -76,6 +80,14 @@ are just different per-exercise target values.
   their `?v=` query or purge Cloudflare.
 - Invite code / admin key live in k8s secrets (`liftnotebook-app-secrets`,
   `exerciselib-app-secrets`) — deploy script prints retrieval commands.
+- User hierarchy: `users.role` (user/admin); admins come ONLY from
+  `ADMIN_EMAILS` (secret key `admin-emails`, set via `LIFTNOTEBOOK_ADMIN_EMAILS`
+  at deploy). The JWT carries `role`; exerciselib validates it (shared
+  jwt-secret, mirrored into `exerciselib-app-secrets`) for catalog writes —
+  libconsole signs in with a LiftNotebook admin account; X-Admin-Key remains
+  as break-glass. exerciselib's DB has no migration runner: catalog/schema
+  changes must be applied to it manually (workouttracker migrations 000003+
+  are written by-name/idempotent so they can be replayed there via psql).
 
 ## Roadmap (approved plan: ~/.claude/plans/cryptic-wobbling-starfish.md)
 

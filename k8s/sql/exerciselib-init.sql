@@ -3,10 +3,13 @@ CREATE EXTENSION IF NOT EXISTS citext;
 DO $$ BEGIN
     CREATE TYPE body_part_enum AS ENUM (
         'chest','back','shoulders','biceps','triceps',
-        'quadriceps','hamstrings','glutes','calves','core','forearms','traps'
+        'quadriceps','hamstrings','glutes','calves','core','forearms','traps',
+        'adductors'
     );
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+-- Existing databases created before 'adductors' was in the list above:
+ALTER TYPE body_part_enum ADD VALUE IF NOT EXISTS 'adductors';
 
 DO $$ BEGIN
     CREATE TYPE exercise_type_enum AS ENUM ('compound','isolation');

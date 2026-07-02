@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import ActiveWorkoutBar from './ActiveWorkoutBar'
 
 // Tab destinations. Library and Nutrition join this list when those
 // features land (Phases 3 and 4) — keep the bar at 5 items max.
@@ -29,6 +30,7 @@ const tabs = [
 export default function BottomNav() {
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-line bg-card/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
+      <ActiveWorkoutBar />
       <div className="mx-auto flex max-w-2xl">
         {tabs.map((tab) => (
           <NavLink
