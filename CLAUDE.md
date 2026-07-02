@@ -23,18 +23,36 @@ are just different per-exercise target values.
 
 ## Webapp conventions
 
+- Design system = "Iron Ledger" (warm paper / midnight-ledger dark, oxblood
+  accent, Fraunces display face). ALL tokens live in `src/index.css`:
+  semantic classes only — `bg-page/card/raised/sunken`, `text-ink/-2/-3/-4`,
+  `border-line/-2`, `text-accent`, `bg-accent-solid/-press`, `text-on-accent`,
+  `bg-wash`, `text-ok/danger/warn` (+`-wash`), `rounded-card/btn/field/sheet`,
+  `shadow-card/raised/sheet`, `font-display`. Stock Tailwind color scales are
+  PURGED — `blue-600` etc. will not compile. Never hardcode hex outside
+  `index.css`/`chartTheme.js`. Text contrast must stay ≥4.5:1 in both themes.
+- Dark mode: `.dark` class on `<html>` via `ThemeProvider` (`src/lib/theme.jsx`,
+  light/dark/system, persisted in localStorage). Tokens flip automatically —
+  never write `dark:` variants for color. Charts must use `useChartTheme()`.
 - UI primitives in `src/components/ui/` (Button, Card, Input, NumberStepper,
   StatTile, BottomSheet, ConfirmSheet, PageHeader, Skeleton, Toast). Use them.
+  All overlays are BottomSheets. Touch targets ≥44px.
 - NEVER use browser `alert()`/`confirm()` — use `useToast()` from
   `src/lib/toastContext` and `ConfirmSheet`.
 - Loading states use `Skeleton`/`PageSkeleton`, never "Loading..." text.
-- Charts follow `src/lib/chartTheme.js` (validated palette: #2a78d6 primary):
-  solid 1px hairline grids, 2px lines, dots with white ring, ≤24px bars with
-  4px rounded data-end, no legend for single series, endpoint direct labels,
-  text in slate tokens never series colors.
+- Charts follow `src/lib/chartTheme.js` (validated palette: #2a78d6 primary,
+  dark-surface steps included — re-run the dataviz validator before adding
+  slots): solid 1px hairline grids, 2px lines, dots with surface ring, ≤24px
+  bars with 4px rounded data-end, no legend for single series, endpoint direct
+  labels, text in ink tokens never series colors.
+- Micro-interactions: pressed/active states on everything (`active:scale`),
+  `animate-stamp/rise/pop/fade-in` keyframes from `index.css`, count-up stat
+  tiles via `useAnimatedNumber` (respects prefers-reduced-motion).
 - User-facing copy says "training block", not "mesocycle" (code keeps mesocycle).
 - Mobile-first: bottom tab bar (Today / Programs / Progress), FocusLayout for
   active workouts, safe-area padding.
+- E2E locators are copy-based — keep visible copy stable or update
+  `e2e/*.spec.js` in the same commit.
 
 ## Commands
 
