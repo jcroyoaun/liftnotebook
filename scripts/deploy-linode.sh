@@ -11,8 +11,8 @@ if [[ -n "${IMAGE_TAG:-}" ]]; then
 else
   IMAGE_TAG=""
 fi
-APP_HOST="${APP_HOST:-liftnotebook.totalcomp.mx}"
-EXERCISELIB_HOST="${EXERCISELIB_HOST:-exerciselib.totalcomp.mx}"
+APP_HOST="${APP_HOST:-liftnotebook.app}"
+EXERCISELIB_HOST="${EXERCISELIB_HOST:-exerciselib.liftnotebook.app}"
 BUILD_IMAGES="${BUILD_IMAGES:-true}"
 # Fresh environments only: creates schemas and loads the exercise catalog
 # seed data. Routine deploys skip this — workouttracker applies its own

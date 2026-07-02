@@ -8,6 +8,9 @@ spec:
     istio: ingress
   servers:
     - hosts:
+        # primary domain first (deploy script patches hosts/0); old domain
+        # stays as an alias
+        - exerciselib.liftnotebook.app
         - exerciselib.totalcomp.mx
       port:
         name: http

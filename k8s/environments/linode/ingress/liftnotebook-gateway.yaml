@@ -8,6 +8,9 @@ spec:
     istio: ingress
   servers:
     - hosts:
+        # primary domain first (deploy script patches hosts/0 with APP_HOST);
+        # the old domain stays as an alias so installed PWAs keep working
+        - liftnotebook.app
         - liftnotebook.totalcomp.mx
       port:
         name: http

@@ -5,6 +5,7 @@ metadata:
   namespace: liftnotebook
 spec:
   hosts:
+    - liftnotebook.app
     - liftnotebook.totalcomp.mx
   gateways:
     - liftnotebook-gateway

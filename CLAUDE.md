@@ -73,7 +73,10 @@ are just different per-exercise target values.
 - Deploy: push to master → GitHub Actions builds images + commits pinned tags →
   `git pull` → `KUBECONFIG_PATH=$PWD/kubeconfig BUILD_IMAGES=false ./scripts/deploy-linode.sh`
   (kubeconfig is gitignored, lives at repo root). Fresh envs only: `RUN_DB_BOOTSTRAP=true`.
-- Cloudflare proxies liftnotebook.totalcomp.mx and honors origin cache
+- Domains: liftnotebook.app = webapp, exerciselib.liftnotebook.app = library
+  console (old *.totalcomp.mx hosts stay as gateway aliases for installed
+  PWAs). Cloudflare proxies both zones (Flexible SSL — origin is HTTP:80
+  behind Istio) and honors origin cache
   headers. webapp nginx.conf: immutable caching is for hashed `/assets/`
   ONLY — `sw.js`/`index.html`/manifest must stay `no-cache` or installed
   PWAs pin to old builds. After changing stable-named files (icons), bump

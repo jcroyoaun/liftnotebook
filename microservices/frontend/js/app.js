@@ -204,7 +204,7 @@ function exerciseApp() {
             if (!password) return;
 
             try {
-                const authBase = window.AUTH_API_BASE || 'https://liftnotebook.totalcomp.mx';
+                const authBase = window.AUTH_API_BASE || 'https://liftnotebook.app';
                 const response = await fetch(`${authBase}/v1/users/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

@@ -5,6 +5,7 @@ metadata:
   namespace: exerciselib
 spec:
   hosts:
+    - exerciselib.liftnotebook.app
     - exerciselib.totalcomp.mx
   gateways:
     - exerciselib-gateway
