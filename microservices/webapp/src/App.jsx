@@ -11,6 +11,7 @@ import MesocycleHistory from './pages/MesocycleHistory'
 import Settings from './pages/Settings'
 import AppLayout from './components/layout/AppLayout'
 import FocusLayout from './components/layout/FocusLayout'
+import { ToastProvider } from './components/ui/Toast'
 import { isTokenValid, clearSession } from './auth/session'
 
 function ProtectedRoute({ children }) {
@@ -23,6 +24,7 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   return (
+    <ToastProvider>
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -49,5 +51,6 @@ export default function App() {
       <Route path="/mesocycle/new" element={<Navigate to="/programs/new" replace />} />
       <Route path="/mesocycles" element={<Navigate to="/programs/history" replace />} />
     </Routes>
+    </ToastProvider>
   )
 }

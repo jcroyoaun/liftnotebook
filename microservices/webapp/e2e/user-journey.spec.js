@@ -112,7 +112,7 @@ test.describe.serial('Full User Journey', () => {
   test('3. Create a 3-day PPL mesocycle', async ({ page }) => {
     await loginAndGo(page, '/')
 
-    await page.click('text=Create Mesocycle')
+    await page.click('text=Create training block')
     await expect(page).toHaveURL('/programs/new')
 
     // Enter name
@@ -414,8 +414,9 @@ test.describe.serial('Full User Journey', () => {
     await loginAndGo(page, '/programs/history')
     await expect(page.locator('text=E2E Test Meso')).toBeVisible()
 
-    page.on('dialog', dialog => dialog.accept())
-    await page.click('button:has-text("Delete")')
+    // Delete via the trash icon, confirmed in the bottom sheet
+    await page.click('button[aria-label="delete E2E Test Meso"]')
+    await page.click('button:has-text("Delete block")')
 
     await expect(page.locator('text=E2E Test Meso')).not.toBeVisible({ timeout: 5000 })
 
@@ -430,7 +431,7 @@ test.describe.serial('Full User Journey', () => {
     await loginAndGo(page, '/')
     await expect(page.locator('text=Welcome')).toBeVisible()
 
-    await page.click('text=Create Mesocycle')
+    await page.click('text=Create training block')
     await page.locator('input[placeholder*="Hypertrophy"]').fill('E2E Meso 2')
     await page.click('button:text-is("2")')
 

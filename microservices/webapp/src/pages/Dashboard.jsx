@@ -4,6 +4,9 @@ import { api } from '../api/client'
 import { getLatestWeeklyVolume } from './dashboardVolume'
 import ExerciseDetailButton from '../components/ExerciseDetailButton'
 import StatTile from '../components/ui/StatTile'
+import ConfirmSheet from '../components/ui/ConfirmSheet'
+import { PageSkeleton } from '../components/ui/Skeleton'
+import { useToast } from '../lib/toastContext'
 
 function getActiveSession() {
   try {
@@ -21,8 +24,10 @@ export default function Dashboard() {
   const [projectedVolume, setProjectedVolume] = useState([])
   const [actualVolume, setActualVolume] = useState([])
   const [sessions, setSessions] = useState([])
+  const [confirmAction, setConfirmAction] = useState(null) // 'end' | 'delete' | null
   const navigate = useNavigate()
   const activeSession = getActiveSession()
+  const toast = useToast()
 
   useEffect(() => { loadActive() }, [])
 
@@ -78,39 +83,39 @@ export default function Dashboard() {
       })
       navigate(`/workout/${data.session.id}`)
     } catch (err) {
-      alert(err.message)
+      toast(err.message)
     } finally {
       setStarting(null)
     }
   }
 
   async function endMeso() {
-    if (!confirm('End this mesocycle? You can start a new one after.')) return
     try {
       await api.endMesocycle(meso.id)
       setMeso(null)
       setDays([])
       setProjectedVolume([])
       setActualVolume([])
+      toast('Training block ended', 'success')
     } catch (err) {
-      alert(err.message)
+      toast(err.message)
     }
   }
 
   async function deleteMeso() {
-    if (!confirm(`Delete "${meso.name}"? This will permanently remove all workout data.`)) return
     try {
       await api.deleteMesocycle(meso.id)
       setMeso(null)
       setDays([])
       setProjectedVolume([])
       setActualVolume([])
+      toast('Training block deleted', 'success')
     } catch (err) {
-      alert(err.message)
+      toast(err.message)
     }
   }
 
-  if (loading) return <div className="text-center py-12 text-slate-400">Loading...</div>
+  if (loading) return <PageSkeleton />
 
   const resumeBanner = activeSession && (
     <Link
@@ -131,10 +136,10 @@ export default function Dashboard() {
         {resumeBanner}
         <div className="text-center py-16">
           <h2 className="text-xl font-bold text-slate-800 mb-2">Welcome!</h2>
-          <p className="text-slate-500 mb-6">Create your first mesocycle to start tracking workouts.</p>
+          <p className="text-slate-500 mb-6">Create your first training block to start logging workouts.</p>
           <Link to="/programs/new"
-            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-medium hover:bg-blue-700">
-            Create Mesocycle
+            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-semibold active:bg-blue-700">
+            Create training block
           </Link>
         </div>
       </div>
@@ -169,11 +174,11 @@ export default function Dashboard() {
             <p className="text-sm text-slate-500">Week {weekNumber} · {meso.days_per_week} days/week</p>
           </div>
           <div className="flex gap-1">
-            <button onClick={endMeso} title="End mesocycle"
+            <button onClick={() => setConfirmAction('end')} title="End training block"
               className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1.5">
               End
             </button>
-            <button onClick={deleteMeso} title="Delete mesocycle"
+            <button onClick={() => setConfirmAction('delete')} title="Delete training block"
               className="text-xs text-red-300 hover:text-red-500 px-2 py-1.5">
               Delete
             </button>
@@ -262,6 +267,23 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      <ConfirmSheet
+        open={confirmAction === 'end'}
+        title="End this training block?"
+        body="The block is archived with all its history. You can start a new one right after."
+        confirmLabel="End block"
+        onConfirm={endMeso}
+        onClose={() => setConfirmAction(null)}
+      />
+      <ConfirmSheet
+        open={confirmAction === 'delete'}
+        title={`Delete "${meso.name}"?`}
+        body="This permanently removes the block and every workout logged in it. This cannot be undone."
+        confirmLabel="Delete block"
+        onConfirm={deleteMeso}
+        onClose={() => setConfirmAction(null)}
+      />
     </div>
   )
 }

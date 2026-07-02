@@ -5,6 +5,7 @@ import { useSessionBundle, useSyncSet, useDeleteSet } from './hooks'
 import ExerciseLogCard from './ExerciseLogCard'
 import RestTimer from './RestTimer'
 import PlateCalculator from './PlateCalculator'
+import { PageSkeleton } from '../../components/ui/Skeleton'
 
 const REST_SECONDS = 180
 const TIMER_KEY = 'restTimerEndsAt'
@@ -77,7 +78,7 @@ export default function WorkoutSession() {
   // Covers both the initial fetch and the pre-restore window of the
   // persisted cache, where the query is pending but not yet fetching.
   if (!session.data) {
-    return <div className="text-center py-12 text-slate-400">Loading...</div>
+    return <PageSkeleton />
   }
 
   const { session: meta, sets, dayExercises } = session.data

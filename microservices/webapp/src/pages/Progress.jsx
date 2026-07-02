@@ -7,6 +7,7 @@ import { api } from '../api/client'
 import { chart, axisTick, formatShortDate } from '../lib/chartTheme'
 import ExerciseDetailButton from '../components/ExerciseDetailButton'
 import StatTile from '../components/ui/StatTile'
+import { PageSkeleton } from '../components/ui/Skeleton'
 
 function E1RMTooltip({ active, payload }) {
   if (!active || !payload?.length) return null
@@ -102,7 +103,7 @@ export default function Progress() {
     return { best, latest, delta, pct, sessions: data.length }
   }, [data])
 
-  if (loading) return <div className="text-center py-12 text-slate-400">Loading...</div>
+  if (loading) return <PageSkeleton />
 
   if (exercises.length === 0) {
     return (

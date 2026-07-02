@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { api } from '../api/client'
 import ExerciseDetailButton from '../components/ExerciseDetailButton'
+import PageHeader from '../components/ui/PageHeader'
+import { Skeleton } from '../components/ui/Skeleton'
+import { useToast } from '../lib/toastContext'
 
 export default function SetupDayExercises() {
   const { id: mesoId, dayId } = useParams()
@@ -15,6 +18,7 @@ export default function SetupDayExercises() {
   const [dayVolume, setDayVolume] = useState([])
   const [weekVolume, setWeekVolume] = useState([])
   const navigate = useNavigate()
+  const toast = useToast()
 
   useEffect(() => {
     setLoading(true)
@@ -32,6 +36,9 @@ export default function SetupDayExercises() {
             exercise_id: e.exercise_id,
             exercise_name: e.exercise_name,
             target_sets: e.target_sets,
+            target_rep_range_low: e.target_rep_range_low,
+            target_rep_range_high: e.target_rep_range_high,
+            target_rir: e.target_rir,
           }))
           setExercises(mapped)
         }
@@ -71,10 +78,14 @@ export default function SetupDayExercises() {
   }, [exercises, fetchVolume])
 
   function addExercise(ex) {
+    // House defaults: 2 working sets of 8-12 taken to failure.
     setExercises(prev => [...prev, {
       exercise_id: ex.id,
       exercise_name: ex.name,
       target_sets: 2,
+      target_rep_range_low: 8,
+      target_rep_range_high: 12,
+      target_rir: 0,
     }])
     setSearch('')
   }
@@ -95,6 +106,9 @@ export default function SetupDayExercises() {
           exercise_id: e.exercise_id,
           position: i + 1,
           target_sets: e.target_sets,
+          target_rep_range_low: e.target_rep_range_low,
+          target_rep_range_high: e.target_rep_range_high,
+          target_rir: e.target_rir,
         }))
       })
 
@@ -105,7 +119,7 @@ export default function SetupDayExercises() {
         navigate('/')
       }
     } catch (err) {
-      alert(err.message)
+      toast(err.message)
     } finally {
       setSaving(false)
     }
@@ -116,7 +130,16 @@ export default function SetupDayExercises() {
     !selectedIds.has(e.id) && e.name.toLowerCase().includes(search.toLowerCase())
   )
 
-  if (loading) return <div className="text-center py-12 text-slate-400">Loading...</div>
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-40" />
+        <Skeleton className="h-16" />
+        <Skeleton className="h-16" />
+      </div>
+    )
+  }
 
   const currentIdx = days.findIndex(d => d.id === parseInt(dayId))
 
@@ -126,82 +149,86 @@ export default function SetupDayExercises() {
 
   return (
     <div className="space-y-4">
-      {/* Day tabs - clickable for navigation */}
-      <div>
-        <div className="flex items-center gap-2 mb-1 flex-wrap">
-          {days.map((d, i) => (
-            <Link key={d.id}
-              to={`/programs/${mesoId}/setup/${d.id}`}
-              className={`text-xs px-3 py-1 rounded-lg transition-colors ${
-                i === currentIdx
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-              }`}>
-              {d.label}
-            </Link>
-          ))}
-        </div>
-        <h2 className="text-lg font-bold text-slate-800">
-          Setup: {day?.label || `Day ${dayId}`}
-        </h2>
+      <PageHeader title={day?.label || `Day ${dayId}`} subtitle="Choose exercises and set targets" backTo="/" />
+
+      {/* Day tabs */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {days.map((d, i) => (
+          <Link key={d.id}
+            to={`/programs/${mesoId}/setup/${d.id}`}
+            className={`text-xs px-3.5 py-2 rounded-full font-medium transition-colors ${
+              i === currentIdx
+                ? 'bg-blue-600 text-white'
+                : 'bg-white border border-slate-200 text-slate-600 active:bg-slate-50'
+            }`}>
+            {d.label}
+          </Link>
+        ))}
       </div>
 
       {/* Volume preview - day + weekly cumulative */}
       {(dayVolume.length > 0 || weekVolume.length > 0) && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-2">
-          <h3 className="text-xs font-semibold text-blue-800 uppercase tracking-wide">
-            Volume (sets per muscle group)
-          </h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-left text-slate-500">
-                  <th className="pr-3 py-0.5 font-medium">Muscle</th>
-                  <th className="px-2 py-0.5 font-medium text-right">This Day</th>
-                  <th className="pl-2 py-0.5 font-medium text-right">Week Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {weekVolume.map(bp => {
-                  const daySets = dayVolumeMap[bp.body_part] || 0
-                  return (
-                    <tr key={bp.body_part}>
-                      <td className="pr-3 py-0.5 font-medium text-slate-700 capitalize">{bp.body_part}</td>
-                      <td className="px-2 py-0.5 text-right font-mono text-blue-700">
-                        {daySets ? Math.round(daySets * 10) / 10 : '-'}
-                      </td>
-                      <td className="pl-2 py-0.5 text-right font-mono text-blue-900 font-semibold">
-                        {Math.round(bp.total_sets * 10) / 10}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-slate-800 mb-2">Volume preview</h3>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-slate-400">
+                <th className="pr-3 py-0.5 font-medium">Muscle</th>
+                <th className="px-2 py-0.5 font-medium text-right">This day</th>
+                <th className="pl-2 py-0.5 font-medium text-right">Week total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {weekVolume.map(bp => {
+                const daySets = dayVolumeMap[bp.body_part] || 0
+                return (
+                  <tr key={bp.body_part}>
+                    <td className="pr-3 py-1 text-slate-600 capitalize">{bp.body_part}</td>
+                    <td className="px-2 py-1 text-right tabular-nums text-slate-700">
+                      {daySets ? Math.round(daySets * 10) / 10 : '–'}
+                    </td>
+                    <td className="pl-2 py-1 text-right tabular-nums font-semibold text-slate-900">
+                      {Math.round(bp.total_sets * 10) / 10}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
       {/* Selected exercises */}
       <div className="space-y-2">
         {exercises.map((ex, i) => (
-          <div key={`${ex.exercise_id}-${i}`} className="bg-white rounded-lg border border-slate-200 p-3 flex items-center gap-3">
-            <span className="text-xs text-slate-400 w-5">{i + 1}</span>
-            <ExerciseDetailButton
-              exerciseId={ex.exercise_id}
-              className="flex-1 text-left text-sm font-medium text-slate-800 hover:text-blue-600"
-            >
-              {ex.exercise_name}
-            </ExerciseDetailButton>
-            <div className="flex items-center gap-1">
-              <button onClick={() => updateSets(i, ex.target_sets - 1)}
-                className="w-6 h-6 rounded bg-slate-100 text-slate-600 text-xs hover:bg-slate-200">-</button>
-              <span className="text-sm w-8 text-center">{ex.target_sets}</span>
-              <button onClick={() => updateSets(i, ex.target_sets + 1)}
-                className="w-6 h-6 rounded bg-slate-100 text-slate-600 text-xs hover:bg-slate-200">+</button>
-              <span className="text-xs text-slate-400 ml-1">sets</span>
+          <div key={`${ex.exercise_id}-${i}`} className="bg-white rounded-xl border border-slate-200 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400 w-5 shrink-0 text-center">{i + 1}</span>
+              <ExerciseDetailButton
+                exerciseId={ex.exercise_id}
+                className="flex-1 min-w-0 text-left text-sm font-medium text-slate-800 hover:text-blue-600 truncate"
+              >
+                {ex.exercise_name}
+              </ExerciseDetailButton>
+              <button onClick={() => removeExercise(i)} aria-label={`remove ${ex.exercise_name}`}
+                className="p-1.5 text-slate-300 active:text-red-500 shrink-0">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <button onClick={() => removeExercise(i)} className="text-red-400 hover:text-red-600 text-sm ml-2">x</button>
+            <div className="flex items-center justify-between mt-1.5 pl-7">
+              <span className="text-[11px] text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">
+                {ex.target_rep_range_low ?? 8}–{ex.target_rep_range_high ?? 12} reps @ RIR {ex.target_rir ?? 0}
+              </span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => updateSets(i, ex.target_sets - 1)} aria-label="fewer sets"
+                  className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 text-sm active:bg-slate-200">−</button>
+                <span className="text-sm w-10 text-center tabular-nums">{ex.target_sets} <span className="text-[10px] text-slate-400">sets</span></span>
+                <button onClick={() => updateSets(i, ex.target_sets + 1)} aria-label="more sets"
+                  className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 text-sm active:bg-slate-200">+</button>
+              </div>
+            </div>
           </div>
         ))}
       </div>
@@ -228,12 +255,12 @@ export default function SetupDayExercises() {
       {/* Action buttons */}
       <div className="flex gap-2">
         <button onClick={() => navigate('/')}
-          className="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200">
-          Dashboard
+          className="px-4 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-medium active:bg-slate-50">
+          Done
         </button>
         <button onClick={save} disabled={saving}
-          className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-          {saving ? 'Saving...' : currentIdx < days.length - 1 ? `Save & Next (${days[currentIdx + 1]?.label})` : 'Save & Finish'}
+          className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-sm font-semibold active:bg-blue-700 disabled:opacity-50">
+          {saving ? 'Saving…' : currentIdx < days.length - 1 ? `Save & Next (${days[currentIdx + 1]?.label})` : 'Save & Finish'}
         </button>
       </div>
     </div>
