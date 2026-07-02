@@ -71,3 +71,14 @@ charts/*.tgz
 kubeconfig
 **/kubeconfig
 k8s/.deploy-overlay.*
+
+# Compiled Go binaries (built in Docker, never committed)
+microservices/workouttracker/api
+microservices/exerciselib/api
+
+# Node
+node_modules/
+
+# Playwright artifacts
+test-results/
+playwright-report/

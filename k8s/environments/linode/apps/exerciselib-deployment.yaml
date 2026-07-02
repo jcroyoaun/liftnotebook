@@ -38,6 +38,11 @@ spec:
                   key: password
             - name: EXERCISELIB_DB_DSN
               value: postgres://$(DB_USER):$(DB_PASSWORD)@exerciselib-db:5432/exerciselib?sslmode=disable
+            - name: ADMIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: exerciselib-app-secrets
+                  key: admin-api-key
           ports:
             - name: http
               containerPort: 4000

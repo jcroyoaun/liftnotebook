@@ -11,13 +11,21 @@ import (
 
 type BodyPart string
 
+// These values must stay in sync with the body_part_enum type defined in the
+// database schema (workouttracker/migrations/000001_init.up.sql).
 const (
-	BodyPartChest     BodyPart = "chest"
-	BodyPartBack      BodyPart = "back"
-	BodyPartShoulders BodyPart = "shoulders"
-	BodyPartArms      BodyPart = "arms"
-	BodyPartLegs      BodyPart = "legs"
-	BodyPartCore      BodyPart = "core"
+	BodyPartChest      BodyPart = "chest"
+	BodyPartBack       BodyPart = "back"
+	BodyPartShoulders  BodyPart = "shoulders"
+	BodyPartBiceps     BodyPart = "biceps"
+	BodyPartTriceps    BodyPart = "triceps"
+	BodyPartQuadriceps BodyPart = "quadriceps"
+	BodyPartHamstrings BodyPart = "hamstrings"
+	BodyPartGlutes     BodyPart = "glutes"
+	BodyPartCalves     BodyPart = "calves"
+	BodyPartCore       BodyPart = "core"
+	BodyPartForearms   BodyPart = "forearms"
+	BodyPartTraps      BodyPart = "traps"
 )
 
 type MuscleModel struct {
@@ -193,6 +201,10 @@ func ValidateMuscle(v *validator.Validator, muscle *Muscle) {
 	v.Check(muscle.Name != "", "name", "must be provided")
 	v.Check(len(muscle.Name) <= 100, "name", "must not be more than 100 bytes long")
 
-	validBodyParts := []BodyPart{BodyPartChest, BodyPartBack, BodyPartShoulders, BodyPartArms, BodyPartLegs, BodyPartCore}
+	validBodyParts := []BodyPart{
+		BodyPartChest, BodyPartBack, BodyPartShoulders, BodyPartBiceps,
+		BodyPartTriceps, BodyPartQuadriceps, BodyPartHamstrings, BodyPartGlutes,
+		BodyPartCalves, BodyPartCore, BodyPartForearms, BodyPartTraps,
+	}
 	v.Check(validator.PermittedValue(BodyPart(muscle.BodyPart), validBodyParts...), "body_part", "must be a valid body part")
 }

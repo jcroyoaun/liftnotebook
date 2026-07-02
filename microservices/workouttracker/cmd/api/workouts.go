@@ -133,6 +133,8 @@ func (app *application) logSetHandler(w http.ResponseWriter, r *http.Request) {
 		Weight           float64 `json:"weight"`
 		Reps             int     `json:"reps"`
 		RIR              *int    `json:"rir"`
+		Recorded         bool    `json:"recorded"`
+		ClientID         *string `json:"client_id"`
 	}
 
 	err := app.readJSON(w, r, &input)
@@ -148,6 +150,8 @@ func (app *application) logSetHandler(w http.ResponseWriter, r *http.Request) {
 		Weight:           input.Weight,
 		Reps:             input.Reps,
 		RIR:              input.RIR,
+		Recorded:         input.Recorded,
+		ClientID:         input.ClientID,
 	}
 
 	v := validator.New()

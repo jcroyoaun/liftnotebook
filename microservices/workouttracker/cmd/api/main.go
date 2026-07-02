@@ -10,6 +10,7 @@ import (
 
 	_ "github.com/lib/pq"
 	"workouttracker.jcroyoaun.io/internal/data"
+	"workouttracker.jcroyoaun.io/migrations"
 )
 
 const version = "1.0.0"
@@ -26,6 +27,10 @@ type config struct {
 	jwt struct {
 		secret string
 	}
+	// inviteCode gates new-user registration. When empty (e.g. local
+	// development), registration is open; when set, /v1/users/register
+	// requires a matching invite_code in the request body.
+	inviteCode string
 }
 
 type application struct {
@@ -44,6 +49,9 @@ func main() {
 	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
 	flag.DurationVar(&cfg.db.maxIdleTime, "db-max-idle-time", 15*time.Minute, "PostgreSQL max connection idle time")
 	flag.StringVar(&cfg.jwt.secret, "jwt-secret", os.Getenv("JWT_SECRET"), "JWT signing secret")
+	flag.StringVar(&cfg.inviteCode, "invite-code", os.Getenv("INVITE_CODE"), "Invite code required for registration (empty = open registration)")
+
+	migrateOnly := flag.Bool("migrate-only", false, "Run database migrations and exit")
 
 	flag.Parse()
 
@@ -57,6 +65,17 @@ func main() {
 	defer db.Close()
 
 	logger.Info("database connection pool established")
+
+	err = migrations.Up(db)
+	if err != nil {
+		logger.Error("database migration failed", "error", err.Error())
+		os.Exit(1)
+	}
+	logger.Info("database migrations applied")
+
+	if *migrateOnly {
+		return
+	}
 
 	app := &application{
 		config: cfg,

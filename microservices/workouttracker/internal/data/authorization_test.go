@@ -51,13 +51,13 @@ func TestTrainingDayModelUpdateExercisesForUserReplacesExercises(t *testing.T) {
 		stubExpectation{
 			op:          "exec",
 			sqlContains: "INSERT INTO training_day_exercises",
-			args:        []driver.Value{int64(77), int64(11), int64(1), int64(4)},
+			args:        []driver.Value{int64(77), int64(11), int64(1), int64(4), int64(8), int64(12), int64(0)},
 			result:      driverRowsAffected(1),
 		},
 		stubExpectation{
 			op:          "exec",
 			sqlContains: "INSERT INTO training_day_exercises",
-			args:        []driver.Value{int64(77), int64(12), int64(2), int64(3)},
+			args:        []driver.Value{int64(77), int64(12), int64(2), int64(3), int64(5), int64(8), int64(2)},
 			result:      driverRowsAffected(1),
 		},
 		stubExpectation{op: "commit"},
@@ -66,8 +66,8 @@ func TestTrainingDayModelUpdateExercisesForUserReplacesExercises(t *testing.T) {
 	model := TrainingDayModel{DB: sqlDB}
 
 	err := model.UpdateExercisesForUser(77, 9, []TrainingExercise{
-		{ExerciseID: 11, Position: 1, TargetSets: 4},
-		{ExerciseID: 12, Position: 2, TargetSets: 3},
+		{ExerciseID: 11, Position: 1, TargetSets: 4, TargetRepRangeLow: 8, TargetRepRangeHigh: 12, TargetRIR: 0},
+		{ExerciseID: 12, Position: 2, TargetSets: 3, TargetRepRangeLow: 5, TargetRepRangeHigh: 8, TargetRIR: 2},
 	})
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
@@ -80,8 +80,8 @@ func TestWorkoutSetModelInsertForUserReturnsNotFoundForUnknownSession(t *testing
 	sqlDB, stub := newStubDB(t,
 		stubExpectation{
 			op:          "query",
-			sqlContains: "FROM workout_sessions ws WHERE ws.id = $1 AND ws.user_id = $8",
-			args:        []driver.Value{int64(5), int64(11), int64(1), 100.0, int64(8), nil, false, int64(9)},
+			sqlContains: "FROM workout_sessions ws WHERE ws.id = $1 AND ws.user_id = $9",
+			args:        []driver.Value{int64(5), int64(11), int64(1), 100.0, int64(8), nil, false, nil, int64(9)},
 			rows: &stubRows{
 				columns: []string{"id", "created_at", "version"},
 			},
@@ -158,8 +158,8 @@ func TestWorkoutSetModelInsertForUserInsertsOwnedSession(t *testing.T) {
 	sqlDB, stub := newStubDB(t,
 		stubExpectation{
 			op:          "query",
-			sqlContains: "FROM workout_sessions ws WHERE ws.id = $1 AND ws.user_id = $8",
-			args:        []driver.Value{int64(5), int64(11), int64(1), 100.0, int64(8), nil, false, int64(9)},
+			sqlContains: "FROM workout_sessions ws WHERE ws.id = $1 AND ws.user_id = $9",
+			args:        []driver.Value{int64(5), int64(11), int64(1), 100.0, int64(8), nil, false, nil, int64(9)},
 			rows: &stubRows{
 				columns: []string{"id", "created_at", "version"},
 				values:  [][]driver.Value{{int64(88), createdAt, int64(1)}},

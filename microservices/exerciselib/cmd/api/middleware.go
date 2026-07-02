@@ -2,6 +2,7 @@
 package main
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"sync"
@@ -50,6 +51,26 @@ func (app *application) metrics(next http.HandlerFunc, path string) http.Handler
 
 		http_requests_total.WithLabelValues(r.Method, path, statusCode).Inc()
 		http_request_duration_seconds.WithLabelValues(r.Method, path, statusCode).Observe(duration.Seconds())
+	}
+}
+
+// requireAdminKey restricts a handler to requests carrying the correct
+// X-Admin-Key header. If no admin key is configured on the server, guarded
+// endpoints fail closed with a 503 instead of being left unauthenticated.
+func (app *application) requireAdminKey(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if app.config.adminAPIKey == "" {
+			app.errorResponse(w, r, http.StatusServiceUnavailable, "admin API key is not configured on the server")
+			return
+		}
+
+		key := r.Header.Get("X-Admin-Key")
+		if subtle.ConstantTimeCompare([]byte(key), []byte(app.config.adminAPIKey)) != 1 {
+			app.invalidAdminKeyResponse(w, r)
+			return
+		}
+
+		next.ServeHTTP(w, r)
 	}
 }
 

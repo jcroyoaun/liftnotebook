@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/subtle"
 	"errors"
 	"net/http"
 	"time"
@@ -12,15 +13,23 @@ import (
 
 func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Name     string `json:"name"`
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Name       string `json:"name"`
+		Email      string `json:"email"`
+		Password   string `json:"password"`
+		InviteCode string `json:"invite_code"`
 	}
 
 	err := app.readJSON(w, r, &input)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
 		return
+	}
+
+	if app.config.inviteCode != "" {
+		if subtle.ConstantTimeCompare([]byte(input.InviteCode), []byte(app.config.inviteCode)) != 1 {
+			app.errorResponse(w, r, http.StatusForbidden, "a valid invite code is required to register")
+			return
+		}
 	}
 
 	user := &data.User{

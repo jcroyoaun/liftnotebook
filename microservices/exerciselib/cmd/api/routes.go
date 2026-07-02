@@ -29,29 +29,30 @@ func (app *application) routes() http.Handler {
 	// Health check
 	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", app.metrics(app.healthcheckHandler, "/v1/healthcheck"))
 
-	// Exercise routes
+	// Exercise routes. All mutating endpoints require the admin API key.
 	router.HandlerFunc(http.MethodGet, "/v1/exercises", app.metrics(app.listExerciseHandle, "/v1/exercises"))
-	router.HandlerFunc(http.MethodPost, "/v1/exercises", app.metrics(app.createExerciseHandler, "/v1/exercises"))
+	router.HandlerFunc(http.MethodPost, "/v1/exercises", app.metrics(app.requireAdminKey(app.createExerciseHandler), "/v1/exercises"))
 	router.HandlerFunc(http.MethodGet, "/v1/exercises/:id", app.metrics(app.showExerciseHandler, "/v1/exercises/:id"))
-	router.HandlerFunc(http.MethodPatch, "/v1/exercises/:id", app.metrics(app.updateExerciseHandler, "/v1/exercises/:id"))
-	router.HandlerFunc(http.MethodDelete, "/v1/exercises/:id", app.metrics(app.deleteExerciseHandler, "/v1/exercises/:id"))
+	router.HandlerFunc(http.MethodPatch, "/v1/exercises/:id", app.metrics(app.requireAdminKey(app.updateExerciseHandler), "/v1/exercises/:id"))
+	router.HandlerFunc(http.MethodDelete, "/v1/exercises/:id", app.metrics(app.requireAdminKey(app.deleteExerciseHandler), "/v1/exercises/:id"))
 
 	// Movement pattern routes
 	router.HandlerFunc(http.MethodGet, "/v1/movement-patterns", app.metrics(app.showMovementPatternsHandler, "/v1/movement-patterns"))
-	router.HandlerFunc(http.MethodPost, "/v1/movement-patterns", app.metrics(app.createMovementPatternHandler, "/v1/movement-patterns"))
+	router.HandlerFunc(http.MethodPost, "/v1/movement-patterns", app.metrics(app.requireAdminKey(app.createMovementPatternHandler), "/v1/movement-patterns"))
 	router.HandlerFunc(http.MethodGet, "/v1/movement-patterns/:id", app.metrics(app.showMovementPatternHandler, "/v1/movement-patterns/:id"))
-	router.HandlerFunc(http.MethodPatch, "/v1/movement-patterns/:id", app.metrics(app.updateMovementPatternHandler, "/v1/movement-patterns/:id"))
-	router.HandlerFunc(http.MethodDelete, "/v1/movement-patterns/:id", app.metrics(app.deleteMovementPatternHandler, "/v1/movement-patterns/:id"))
+	router.HandlerFunc(http.MethodPatch, "/v1/movement-patterns/:id", app.metrics(app.requireAdminKey(app.updateMovementPatternHandler), "/v1/movement-patterns/:id"))
+	router.HandlerFunc(http.MethodDelete, "/v1/movement-patterns/:id", app.metrics(app.requireAdminKey(app.deleteMovementPatternHandler), "/v1/movement-patterns/:id"))
 
 	// Muscle routes
 	router.HandlerFunc(http.MethodGet, "/v1/muscles", app.metrics(app.listMusclesHandler, "/v1/muscles"))
-	router.HandlerFunc(http.MethodPost, "/v1/muscles", app.metrics(app.createMuscleHandler, "/v1/muscles"))
+	router.HandlerFunc(http.MethodPost, "/v1/muscles", app.metrics(app.requireAdminKey(app.createMuscleHandler), "/v1/muscles"))
 	router.HandlerFunc(http.MethodGet, "/v1/muscles/:id", app.metrics(app.showMuscleHandler, "/v1/muscles/:id"))
-	router.HandlerFunc(http.MethodPatch, "/v1/muscles/:id", app.metrics(app.updateMuscleHandler, "/v1/muscles/:id"))
-	router.HandlerFunc(http.MethodDelete, "/v1/muscles/:id", app.metrics(app.deleteMuscleHandler, "/v1/muscles/:id"))
+	router.HandlerFunc(http.MethodPatch, "/v1/muscles/:id", app.metrics(app.requireAdminKey(app.updateMuscleHandler), "/v1/muscles/:id"))
+	router.HandlerFunc(http.MethodDelete, "/v1/muscles/:id", app.metrics(app.requireAdminKey(app.deleteMuscleHandler), "/v1/muscles/:id"))
 
-	// User routes
-	router.HandlerFunc(http.MethodPost, "/v1/users", app.metrics(app.registerUserHandler, "/v1/users"))
+	// User routes. Registration here is admin-only scaffolding — end users
+	// register through the workouttracker API instead.
+	router.HandlerFunc(http.MethodPost, "/v1/users", app.metrics(app.requireAdminKey(app.registerUserHandler), "/v1/users"))
 
 	// Return the httprouter instance.
 	return app.recoverPanic(app.rateLimit(router))

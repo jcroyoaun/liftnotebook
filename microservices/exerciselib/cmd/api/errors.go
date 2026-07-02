@@ -75,3 +75,8 @@ func (app *application) rateLimitExceededResponse(w http.ResponseWriter, r *http
 	message := "rate limit exceeded"
 	app.errorResponse(w, r, http.StatusTooManyRequests, message)
 }
+
+func (app *application) invalidAdminKeyResponse(w http.ResponseWriter, r *http.Request) {
+	message := "invalid or missing admin API key"
+	app.errorResponse(w, r, http.StatusUnauthorized, message)
+}

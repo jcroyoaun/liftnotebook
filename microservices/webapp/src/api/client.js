@@ -62,6 +62,7 @@ export const api = {
 
   // Training day exercises
   updateDayExercises: (dayId, body) => request(`/training-days/${dayId}/exercises`, { method: 'PUT', body: JSON.stringify(body) }),
+  getSuggestions: (dayId) => request(`/training-days/${dayId}/suggestions`),
 
   // Sessions
   createSession: (body) => request('/sessions', { method: 'POST', body: JSON.stringify(body) }),

@@ -18,6 +18,7 @@ type Models struct {
 	WorkoutSets     WorkoutSetModel
 	Exercises       ExerciseReader
 	Progress        ProgressModel
+	Progression     ProgressionModel
 	Volume          VolumeModel
 }
 
@@ -30,6 +31,7 @@ func NewModels(db *sql.DB) Models {
 		WorkoutSets:     WorkoutSetModel{DB: db},
 		Exercises:       ExerciseReader{DB: db},
 		Progress:        ProgressModel{DB: db},
+		Progression:     ProgressionModel{DB: db},
 		Volume:          VolumeModel{DB: db},
 	}
 }

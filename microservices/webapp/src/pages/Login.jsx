@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import { setSession } from '../auth/session'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -15,8 +16,7 @@ export default function Login() {
     setLoading(true)
     try {
       const data = await api.login({ email, password })
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
+      setSession(data.token, data.user)
       navigate('/')
     } catch (err) {
       setError(err.message)

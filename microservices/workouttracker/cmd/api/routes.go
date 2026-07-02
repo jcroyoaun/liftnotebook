@@ -35,6 +35,7 @@ func (app *application) routes() http.Handler {
 
 	// Training day exercises
 	router.HandlerFunc(http.MethodPut, "/v1/training-days/:id/exercises", app.requireAuth(app.trainingDayExercisesHandler))
+	router.HandlerFunc(http.MethodGet, "/v1/training-days/:id/suggestions", app.requireAuth(app.getTrainingDaySuggestionsHandler))
 
 	// Workout sessions
 	router.HandlerFunc(http.MethodPost, "/v1/sessions", app.requireAuth(app.createWorkoutSessionHandler))

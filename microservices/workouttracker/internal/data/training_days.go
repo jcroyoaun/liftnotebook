@@ -20,12 +20,37 @@ type TrainingDay struct {
 }
 
 type TrainingExercise struct {
-	ID            int64  `json:"id"`
-	TrainingDayID int64  `json:"training_day_id"`
-	ExerciseID    int64  `json:"exercise_id"`
-	ExerciseName  string `json:"exercise_name"`
-	Position      int    `json:"position"`
-	TargetSets    int    `json:"target_sets"`
+	ID                 int64  `json:"id"`
+	TrainingDayID      int64  `json:"training_day_id"`
+	ExerciseID         int64  `json:"exercise_id"`
+	ExerciseName       string `json:"exercise_name"`
+	Position           int    `json:"position"`
+	TargetSets         int    `json:"target_sets"`
+	TargetRepRangeLow  int    `json:"target_rep_range_low"`
+	TargetRepRangeHigh int    `json:"target_rep_range_high"`
+	TargetRIR          int    `json:"target_rir"`
+}
+
+// ApplyTargetDefaults fills unset training targets with the house defaults:
+// 2 working sets of 8-12 reps taken to failure (RIR 0).
+func (te *TrainingExercise) ApplyTargetDefaults() {
+	if te.TargetSets == 0 {
+		te.TargetSets = 2
+	}
+	if te.TargetRepRangeLow == 0 {
+		te.TargetRepRangeLow = 8
+	}
+	if te.TargetRepRangeHigh == 0 {
+		te.TargetRepRangeHigh = 12
+	}
+}
+
+func ValidateTrainingExercise(v *validator.Validator, te *TrainingExercise) {
+	v.Check(te.ExerciseID > 0, "exercise_id", "must be a positive integer")
+	v.Check(te.TargetSets >= 1, "target_sets", "must be at least 1")
+	v.Check(te.TargetRepRangeLow >= 1, "target_rep_range_low", "must be at least 1")
+	v.Check(te.TargetRepRangeHigh >= te.TargetRepRangeLow, "target_rep_range_high", "must not be lower than target_rep_range_low")
+	v.Check(te.TargetRIR >= 0 && te.TargetRIR <= 10, "target_rir", "must be between 0 and 10")
 }
 
 type TrainingDayModel struct {
@@ -182,7 +207,8 @@ func (m TrainingDayModel) RemoveExercise(id int64) error {
 
 func (m TrainingDayModel) GetExercisesForDay(trainingDayID int64) ([]TrainingExercise, error) {
 	query := `
-		SELECT tde.id, tde.training_day_id, tde.exercise_id, e.name, tde.position, tde.target_sets
+		SELECT tde.id, tde.training_day_id, tde.exercise_id, e.name, tde.position, tde.target_sets,
+		       tde.target_rep_range_low, tde.target_rep_range_high, tde.target_rir
 		FROM training_day_exercises tde
 		JOIN exercises e ON tde.exercise_id = e.id
 		WHERE tde.training_day_id = $1
@@ -200,7 +226,8 @@ func (m TrainingDayModel) GetExercisesForDay(trainingDayID int64) ([]TrainingExe
 	var exercises []TrainingExercise
 	for rows.Next() {
 		var te TrainingExercise
-		err := rows.Scan(&te.ID, &te.TrainingDayID, &te.ExerciseID, &te.ExerciseName, &te.Position, &te.TargetSets)
+		err := rows.Scan(&te.ID, &te.TrainingDayID, &te.ExerciseID, &te.ExerciseName, &te.Position, &te.TargetSets,
+			&te.TargetRepRangeLow, &te.TargetRepRangeHigh, &te.TargetRIR)
 		if err != nil {
 			return nil, err
 		}
@@ -224,9 +251,9 @@ func (m TrainingDayModel) UpdateExercises(trainingDayID int64, exercises []Train
 		return err
 	}
 
-	query := `INSERT INTO training_day_exercises (training_day_id, exercise_id, position, target_sets) VALUES ($1, $2, $3, $4)`
+	query := `INSERT INTO training_day_exercises (training_day_id, exercise_id, position, target_sets, target_rep_range_low, target_rep_range_high, target_rir) VALUES ($1, $2, $3, $4, $5, $6, $7)`
 	for _, ex := range exercises {
-		_, err = tx.ExecContext(ctx, query, trainingDayID, ex.ExerciseID, ex.Position, ex.TargetSets)
+		_, err = tx.ExecContext(ctx, query, trainingDayID, ex.ExerciseID, ex.Position, ex.TargetSets, ex.TargetRepRangeLow, ex.TargetRepRangeHigh, ex.TargetRIR)
 		if err != nil {
 			return err
 		}
@@ -264,9 +291,9 @@ func (m TrainingDayModel) UpdateExercisesForUser(trainingDayID, userID int64, ex
 		return err
 	}
 
-	query := `INSERT INTO training_day_exercises (training_day_id, exercise_id, position, target_sets) VALUES ($1, $2, $3, $4)`
+	query := `INSERT INTO training_day_exercises (training_day_id, exercise_id, position, target_sets, target_rep_range_low, target_rep_range_high, target_rir) VALUES ($1, $2, $3, $4, $5, $6, $7)`
 	for _, ex := range exercises {
-		_, err = tx.ExecContext(ctx, query, trainingDayID, ex.ExerciseID, ex.Position, ex.TargetSets)
+		_, err = tx.ExecContext(ctx, query, trainingDayID, ex.ExerciseID, ex.Position, ex.TargetSets, ex.TargetRepRangeLow, ex.TargetRepRangeHigh, ex.TargetRIR)
 		if err != nil {
 			return err
 		}

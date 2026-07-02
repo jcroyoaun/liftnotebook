@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"workouttracker.jcroyoaun.io/internal/data"
+	"workouttracker.jcroyoaun.io/internal/validator"
 )
 
 var errMissingExerciseID = errors.New("exercise_id query parameter is required")
@@ -164,9 +165,12 @@ func (app *application) trainingDayExercisesHandler(w http.ResponseWriter, r *ht
 
 	var input struct {
 		Exercises []struct {
-			ExerciseID int64 `json:"exercise_id"`
-			Position   int   `json:"position"`
-			TargetSets int   `json:"target_sets"`
+			ExerciseID         int64 `json:"exercise_id"`
+			Position           int   `json:"position"`
+			TargetSets         int   `json:"target_sets"`
+			TargetRepRangeLow  int   `json:"target_rep_range_low"`
+			TargetRepRangeHigh int   `json:"target_rep_range_high"`
+			TargetRIR          int   `json:"target_rir"`
 		} `json:"exercises"`
 	}
 
@@ -176,13 +180,24 @@ func (app *application) trainingDayExercisesHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
+	v := validator.New()
 	var exercises []data.TrainingExercise
 	for _, e := range input.Exercises {
-		exercises = append(exercises, data.TrainingExercise{
-			ExerciseID: e.ExerciseID,
-			Position:   e.Position,
-			TargetSets: e.TargetSets,
-		})
+		te := data.TrainingExercise{
+			ExerciseID:         e.ExerciseID,
+			Position:           e.Position,
+			TargetSets:         e.TargetSets,
+			TargetRepRangeLow:  e.TargetRepRangeLow,
+			TargetRepRangeHigh: e.TargetRepRangeHigh,
+			TargetRIR:          e.TargetRIR,
+		}
+		te.ApplyTargetDefaults()
+		data.ValidateTrainingExercise(v, &te)
+		exercises = append(exercises, te)
+	}
+	if !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
 	}
 
 	err = app.models.TrainingDays.UpdateExercisesForUser(id, userID, exercises)

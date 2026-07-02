@@ -13,6 +13,7 @@ function exerciseApp() {
         loadingExercises: false,
         modalOpen: false,
         currentExercise: null,
+        adminKey: localStorage.getItem('adminKey') || '',
         
         // Data
         exercises: [],
@@ -186,14 +187,38 @@ function exerciseApp() {
             this.openModal(exercise);
         },
         
+        // Write endpoints require the admin API key (X-Admin-Key header).
+        ensureAdminKey() {
+            if (!this.adminKey) {
+                this.promptAdminKey();
+            }
+            return this.adminKey;
+        },
+
+        promptAdminKey() {
+            const key = prompt('Enter the admin API key:');
+            if (key) {
+                this.adminKey = key;
+                localStorage.setItem('adminKey', key);
+            }
+        },
+
+        handleUnauthorized() {
+            this.adminKey = '';
+            localStorage.removeItem('adminKey');
+            this.showError('Admin key rejected. Click the key icon to set it and try again.');
+        },
+
         async saveExercise() {
             try {
-                const url = this.currentExercise 
-                    ? `/v1/exercises/${this.currentExercise.id}` 
+                if (!this.ensureAdminKey()) return;
+
+                const url = this.currentExercise
+                    ? `/v1/exercises/${this.currentExercise.id}`
                     : '/v1/exercises';
-                
+
                 const method = this.currentExercise ? 'PATCH' : 'POST';
-                
+
                 const payload = {
                     name: this.formData.name,
                     type: this.formData.type,
@@ -201,15 +226,21 @@ function exerciseApp() {
                     primary_muscles: this.formData.primary_muscles,
                     secondary_muscles: this.formData.secondary_muscles
                 };
-                
+
                 const response = await fetch(url, {
                     method: method,
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'X-Admin-Key': this.adminKey
                     },
                     body: JSON.stringify(payload)
                 });
-                
+
+                if (response.status === 401) {
+                    this.handleUnauthorized();
+                    return;
+                }
+
                 if (!response.ok) {
                     const error = await response.json();
                     throw new Error(error.error || 'Failed to save exercise');
@@ -229,12 +260,22 @@ function exerciseApp() {
         
         async deleteExercise(id) {
             if (!confirm('Are you sure you want to delete this exercise?')) return;
-            
+
             try {
+                if (!this.ensureAdminKey()) return;
+
                 const response = await fetch(`/v1/exercises/${id}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    headers: {
+                        'X-Admin-Key': this.adminKey
+                    }
                 });
-                
+
+                if (response.status === 401) {
+                    this.handleUnauthorized();
+                    return;
+                }
+
                 if (!response.ok) {
                     throw new Error('Failed to delete exercise');
                 }

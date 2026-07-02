@@ -1,19 +1,78 @@
-import { useState, useEffect } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { useState, useEffect, useMemo } from 'react'
+import {
+  ComposedChart, Area, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, LabelList,
+} from 'recharts'
 import { api } from '../api/client'
+import { chart, axisTick, formatShortDate } from '../lib/chartTheme'
 import ExerciseDetailButton from '../components/ExerciseDetailButton'
+import StatTile from '../components/ui/StatTile'
+
+function E1RMTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null
+  const p = payload[0].payload
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm px-3 py-2 text-xs">
+      <div className="font-medium text-slate-800">{p.date}</div>
+      <div className="text-slate-500 mt-0.5">
+        {p.weight} kg × {p.reps}
+        {p.rir != null && ` @ RIR ${p.rir}`}
+      </div>
+      <div className="text-slate-800 font-semibold mt-0.5">e1RM {p.avg_e1rm} kg</div>
+    </div>
+  )
+}
+
+// Direct label on the endpoint only — the current e1RM is the headline.
+function LastPointLabel({ x, y, index, value, count }) {
+  if (index !== count - 1) return null
+  return (
+    <text x={x} y={y - 12} textAnchor="end" fontSize={12} fontWeight={600} fill="#0f172a">
+      {Math.round(value)} kg
+    </text>
+  )
+}
+
+function VolumeTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null
+  const p = payload[0].payload
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm px-3 py-2 text-xs">
+      <div className="font-medium text-slate-800">Week of {p.week}</div>
+      <div className="text-slate-500 mt-0.5">{p.sets} working sets</div>
+    </div>
+  )
+}
 
 export default function Progress() {
   const [exercises, setExercises] = useState([])
   const [selectedExercise, setSelectedExercise] = useState(null)
   const [data, setData] = useState([])
+  const [weekly, setWeekly] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadingProgress, setLoadingProgress] = useState(false)
-  const [search, setSearch] = useState('')
+  const [showHistory, setShowHistory] = useState(false)
 
   useEffect(() => {
-    api.getUserExercises()
-      .then(d => setExercises(d.exercises || []))
+    Promise.all([
+      api.getUserExercises().then((d) => d.exercises || []),
+      api
+        .getActiveMesocycle()
+        .then((d) =>
+          d.mesocycle ? api.getWeeklyVolume(d.mesocycle.id).then((w) => w.weekly_volume || []) : [],
+        )
+        .catch(() => []),
+    ])
+      .then(([exs, weeklyVolume]) => {
+        setExercises(exs)
+        setWeekly(
+          weeklyVolume.map((w) => ({
+            week: formatShortDate(w.week_start),
+            sets: Object.values(w.body_parts || {}).reduce((a, b) => a + b, 0),
+          })),
+        )
+        if (exs.length > 0) loadProgress(exs[0].id)
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -22,112 +81,182 @@ export default function Progress() {
     setLoadingProgress(true)
     try {
       const d = await api.getE1RMProgress(exerciseId)
-      setData((d.progress || []).map(p => ({
-        ...p,
-        date: new Date(p.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      })))
+      setData(
+        (d.progress || []).map((p) => ({
+          ...p,
+          date: formatShortDate(p.date),
+        })),
+      )
     } finally {
       setLoadingProgress(false)
     }
   }
 
-  const filtered = exercises.filter(e => e.name.toLowerCase().includes(search.toLowerCase()))
-  const selectedName = exercises.find(e => e.id === selectedExercise)?.name
+  const stats = useMemo(() => {
+    if (data.length === 0) return null
+    const best = Math.round(Math.max(...data.map((p) => p.avg_e1rm)))
+    const first = data[0].avg_e1rm
+    const latest = Math.round(data[data.length - 1].avg_e1rm)
+    const delta = Math.round((data[data.length - 1].avg_e1rm - first) * 10) / 10
+    const pct = first > 0 ? Math.round((delta / first) * 100) : 0
+    return { best, latest, delta, pct, sessions: data.length }
+  }, [data])
 
   if (loading) return <div className="text-center py-12 text-slate-400">Loading...</div>
 
+  if (exercises.length === 0) {
+    return (
+      <div className="text-center py-16 text-slate-400">
+        No exercises with recorded sets yet. Log some workouts first!
+      </div>
+    )
+  }
+
+  const selectedName = exercises.find((e) => e.id === selectedExercise)?.name
+
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-slate-800">Progress (Estimated 1RM)</h2>
+      <h1 className="text-xl font-bold text-slate-900">Progress</h1>
 
-      {exercises.length === 0 && !selectedExercise ? (
-        <div className="text-center py-8 text-slate-400">
-          No exercises with recorded sets yet. Log some workouts first!
-        </div>
+      {/* Exercise picker: horizontal chips */}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+        {exercises.map((ex) => (
+          <button
+            key={ex.id}
+            onClick={() => loadProgress(ex.id)}
+            className={`shrink-0 px-3.5 py-2 rounded-full text-xs font-medium transition-colors ${
+              ex.id === selectedExercise
+                ? 'bg-blue-600 text-white'
+                : 'bg-white border border-slate-200 text-slate-600 active:bg-slate-50'
+            }`}
+          >
+            {ex.name}
+          </button>
+        ))}
+      </div>
+
+      {loadingProgress ? (
+        <div className="text-center py-8 text-slate-400">Loading...</div>
       ) : (
-        <>
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search your exercises..."
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-
-          {!selectedExercise && (
-            <div className="grid grid-cols-1 gap-1 max-h-64 overflow-y-auto">
-              {filtered.map(ex => (
-                <div key={ex.id} className="flex gap-2">
-                  <button onClick={() => loadProgress(ex.id)}
-                    className="flex-1 text-left px-3 py-2 text-sm bg-white rounded-lg border border-slate-200 hover:bg-blue-50">
-                    <span className="font-medium">{ex.name}</span>
-                    <span className="text-xs text-slate-400 ml-2">{ex.movement_pattern}</span>
-                  </button>
-                  <ExerciseDetailButton
-                    exerciseId={ex.id}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-                  >
-                    Targets
-                  </ExerciseDetailButton>
-                </div>
-              ))}
+        stats && (
+          <>
+            {/* KPI row */}
+            <div className="grid grid-cols-3 gap-2">
+              <StatTile label="Current e1RM" value={`${stats.latest}`} sub="kg" />
+              <StatTile
+                label="This block"
+                value={
+                  <span className={stats.delta >= 0 ? 'text-green-700' : 'text-red-600'}>
+                    {stats.delta >= 0 ? '▲' : '▼'} {Math.abs(stats.delta)}
+                  </span>
+                }
+                sub={`kg (${stats.pct >= 0 ? '+' : ''}${stats.pct}%)`}
+              />
+              <StatTile label="Sessions" value={stats.sessions} sub="logged" />
             </div>
-          )}
 
-          {selectedExercise && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-slate-800">{selectedName}</h3>
-                  <ExerciseDetailButton
-                    exerciseId={selectedExercise}
-                    className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-blue-50 hover:text-blue-700"
-                  >
-                    Targets
-                  </ExerciseDetailButton>
+            {/* e1RM trend */}
+            <div className="bg-white rounded-xl border border-slate-200 p-4">
+              <div className="flex items-center justify-between mb-1">
+                <div>
+                  <div className="text-sm font-semibold text-slate-800">{selectedName}</div>
+                  <div className="text-[11px] text-slate-400">Estimated 1RM per session (kg)</div>
                 </div>
-                <button onClick={() => { setSelectedExercise(null); setData([]) }}
-                  className="text-xs text-slate-500 hover:text-slate-700">Change exercise</button>
+                <ExerciseDetailButton
+                  exerciseId={selectedExercise}
+                  className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600"
+                >
+                  Info
+                </ExerciseDetailButton>
               </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={data} margin={{ top: 18, right: 8, left: -18, bottom: 0 }}>
+                  <CartesianGrid stroke={chart.grid} strokeWidth={1} vertical={false} />
+                  <XAxis dataKey="date" tick={axisTick} axisLine={false} tickLine={false} />
+                  <YAxis
+                    tick={axisTick}
+                    axisLine={false}
+                    tickLine={false}
+                    domain={['auto', 'auto']}
+                    width={52}
+                  />
+                  <Tooltip content={<E1RMTooltip />} cursor={{ stroke: chart.grid }} />
+                  <Area
+                    type="monotone"
+                    dataKey="avg_e1rm"
+                    stroke="none"
+                    fill={chart.series1}
+                    fillOpacity={0.1}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="avg_e1rm"
+                    stroke={chart.series1}
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    dot={{ r: 4, fill: chart.series1, stroke: chart.surface, strokeWidth: 2 }}
+                    activeDot={{ r: 5, stroke: chart.surface, strokeWidth: 2 }}
+                  >
+                    <LabelList
+                      dataKey="avg_e1rm"
+                      content={(props) => <LastPointLabel {...props} count={data.length} />}
+                    />
+                  </Line>
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
 
-              {loadingProgress ? (
-                <div className="text-center py-8 text-slate-400">Loading...</div>
-              ) : data.length === 0 ? (
-                <div className="text-center py-8 text-slate-400">No data yet. Log some workouts first!</div>
-              ) : (
-                <div className="bg-white rounded-xl border border-slate-200 p-4">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={data}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} domain={['auto', 'auto']} />
-                      <Tooltip
-                        contentStyle={{ borderRadius: 8, fontSize: 12 }}
-                        formatter={(value, name) => [`${value} lbs`, name === 'avg_e1rm' ? 'Avg e1RM' : name]}
-                      />
-                      <Legend />
-                      <Line type="monotone" dataKey="avg_e1rm" name="Avg e1RM" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} />
-                      <Line type="monotone" dataKey="epley_e1rm" name="Epley" stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 4" dot={false} />
-                      <Line type="monotone" dataKey="brzycki_e1rm" name="Brzycki" stroke="#cbd5e1" strokeWidth={1} strokeDasharray="4 4" dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-
-                  {/* Data table */}
-                  <div className="mt-4 text-xs">
-                    <div className="grid grid-cols-5 gap-2 font-medium text-slate-500 border-b pb-1">
-                      <div>Date</div><div>Weight</div><div>Reps</div><div>RIR</div><div>e1RM</div>
-                    </div>
-                    {data.map((p, i) => (
-                      <div key={i} className="grid grid-cols-5 gap-2 py-1 border-b border-slate-50">
-                        <div>{p.date}</div>
-                        <div>{p.weight}</div>
-                        <div>{p.reps}</div>
-                        <div>{p.rir ?? '-'}</div>
-                        <div className="font-medium">{p.avg_e1rm}</div>
-                      </div>
-                    ))}
+            {/* History table (relief view) */}
+            <div className="bg-white rounded-xl border border-slate-200">
+              <button
+                onClick={() => setShowHistory((s) => !s)}
+                className="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-slate-700"
+              >
+                Session history
+                <span className="text-slate-400">{showHistory ? '▾' : '▸'}</span>
+              </button>
+              {showHistory && (
+                <div className="px-4 pb-4 text-xs">
+                  <div className="grid grid-cols-5 gap-2 font-medium text-slate-500 border-b border-slate-100 pb-1">
+                    <div>Date</div>
+                    <div>Weight</div>
+                    <div>Reps</div>
+                    <div>RIR</div>
+                    <div>e1RM</div>
                   </div>
+                  {[...data].reverse().map((p, i) => (
+                    <div key={i} className="grid grid-cols-5 gap-2 py-1.5 border-b border-slate-50 text-slate-600">
+                      <div>{p.date}</div>
+                      <div>{p.weight} kg</div>
+                      <div>{p.reps}</div>
+                      <div>{p.rir ?? '–'}</div>
+                      <div className="font-semibold text-slate-800">{p.avg_e1rm}</div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-          )}
-        </>
+          </>
+        )
+      )}
+
+      {/* Weekly volume across the block */}
+      {weekly.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <div className="text-sm font-semibold text-slate-800">Weekly volume</div>
+          <div className="text-[11px] text-slate-400 mb-1">Working sets per week, current block</div>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={weekly} margin={{ top: 18, right: 8, left: -18, bottom: 0 }} barCategoryGap="30%">
+              <CartesianGrid stroke={chart.grid} strokeWidth={1} vertical={false} />
+              <XAxis dataKey="week" tick={axisTick} axisLine={false} tickLine={false} />
+              <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} width={52} />
+              <Tooltip content={<VolumeTooltip />} cursor={{ fill: 'rgba(226,232,240,0.4)' }} />
+              <Bar dataKey="sets" fill={chart.series1} radius={[4, 4, 0, 0]} maxBarSize={24}>
+                <LabelList dataKey="sets" position="top" style={{ fontSize: 11, fill: chart.axisText }} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       )}
     </div>
   )

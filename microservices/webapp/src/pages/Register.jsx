@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import { setSession } from '../auth/session'
 
 export default function Register() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -15,9 +17,8 @@ export default function Register() {
     setError('')
     setLoading(true)
     try {
-      const data = await api.register({ name, email, password })
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
+      const data = await api.register({ name, email, password, invite_code: inviteCode })
+      setSession(data.token, data.user)
       navigate('/')
     } catch (err) {
       setError(err.message)
@@ -47,6 +48,12 @@ export default function Register() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
             <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={8}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Invite Code</label>
+            <input type="text" value={inviteCode} onChange={e => setInviteCode(e.target.value)}
+              placeholder="Ask the person who invited you"
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <button type="submit" disabled={loading}

@@ -39,7 +39,7 @@ export default function CreateMesocycle() {
         days: dayLabels.map((label, i) => ({ day_number: i + 1, label })),
       }
       const data = await api.createMesocycle(body)
-      navigate(`/mesocycle/${data.mesocycle.id}/setup/${data.days[0].id}`)
+      navigate(`/programs/${data.mesocycle.id}/setup/${data.days[0].id}`)
     } catch (err) {
       setError(err.message)
     } finally {

@@ -100,7 +100,7 @@ export default function SetupDayExercises() {
 
       const currentIdx = days.findIndex(d => d.id === parseInt(dayId))
       if (currentIdx < days.length - 1) {
-        navigate(`/mesocycle/${mesoId}/setup/${days[currentIdx + 1].id}`)
+        navigate(`/programs/${mesoId}/setup/${days[currentIdx + 1].id}`)
       } else {
         navigate('/')
       }
@@ -124,12 +124,6 @@ export default function SetupDayExercises() {
   const dayVolumeMap = {}
   dayVolume.forEach(bp => { dayVolumeMap[bp.body_part] = bp.total_sets })
 
-  // Collect all body parts from both day and week
-  const allBodyParts = [...new Set([
-    ...weekVolume.map(bp => bp.body_part),
-    ...dayVolume.map(bp => bp.body_part),
-  ])]
-
   return (
     <div className="space-y-4">
       {/* Day tabs - clickable for navigation */}
@@ -137,7 +131,7 @@ export default function SetupDayExercises() {
         <div className="flex items-center gap-2 mb-1 flex-wrap">
           {days.map((d, i) => (
             <Link key={d.id}
-              to={`/mesocycle/${mesoId}/setup/${d.id}`}
+              to={`/programs/${mesoId}/setup/${d.id}`}
               className={`text-xs px-3 py-1 rounded-lg transition-colors ${
                 i === currentIdx
                   ? 'bg-blue-600 text-white'

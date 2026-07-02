@@ -80,9 +80,10 @@ test.describe.serial('Full User Journey', () => {
   // 1. REGISTER
   test('1. Register new user', async ({ page }) => {
     await page.goto('/register')
-    await page.locator('input[type="text"]').fill(TEST_USER.name)
+    await page.locator('input[type="text"]').first().fill(TEST_USER.name)
     await page.locator('input[type="email"]').fill(TEST_USER.email)
     await page.locator('input[type="password"]').fill(TEST_USER.password)
+    // Invite code field stays empty: the local API runs without INVITE_CODE
     await page.locator('button[type="submit"]').click()
 
     await expect(page).toHaveURL('/', { timeout: 5000 })
@@ -112,7 +113,7 @@ test.describe.serial('Full User Journey', () => {
     await loginAndGo(page, '/')
 
     await page.click('text=Create Mesocycle')
-    await expect(page).toHaveURL('/mesocycle/new')
+    await expect(page).toHaveURL('/programs/new')
 
     // Enter name
     await page.locator('input[placeholder*="Hypertrophy"]').fill('E2E Test Meso')
@@ -123,8 +124,8 @@ test.describe.serial('Full User Journey', () => {
     await page.locator('button[type="submit"]').click()
 
     // Should redirect to setup first day
-    await page.waitForURL(/\/mesocycle\/\d+\/setup\/\d+/)
-    mesoId = parseInt(page.url().match(/mesocycle\/(\d+)/)[1])
+    await page.waitForURL(/\/programs\/\d+\/setup\/\d+/)
+    mesoId = parseInt(page.url().match(/programs\/(\d+)/)[1])
     expect(mesoId).toBeGreaterThan(0)
 
     // Fetch day IDs via API
@@ -135,7 +136,7 @@ test.describe.serial('Full User Journey', () => {
 
   // 4. SETUP EXERCISES
   test('4a. Setup Push day exercises', async ({ page }) => {
-    await loginAndGo(page, `/mesocycle/${mesoId}/setup/${dayIds[0]}`)
+    await loginAndGo(page, `/programs/${mesoId}/setup/${dayIds[0]}`)
 
     // Add Flat Bench
     await page.locator('input[placeholder*="Search"]').fill('Flat Barbell')
@@ -154,7 +155,7 @@ test.describe.serial('Full User Journey', () => {
   })
 
   test('4b. Setup Pull day exercises', async ({ page }) => {
-    await loginAndGo(page, `/mesocycle/${mesoId}/setup/${dayIds[1]}`)
+    await loginAndGo(page, `/programs/${mesoId}/setup/${dayIds[1]}`)
 
     await page.locator('input[placeholder*="Search"]').fill('Pull-up')
     await page.click('button:has-text("Overhand Pull-up")')
@@ -170,7 +171,7 @@ test.describe.serial('Full User Journey', () => {
   })
 
   test('4c. Setup Legs day exercises', async ({ page }) => {
-    await loginAndGo(page, `/mesocycle/${mesoId}/setup/${dayIds[2]}`)
+    await loginAndGo(page, `/programs/${mesoId}/setup/${dayIds[2]}`)
 
     await page.locator('input[placeholder*="Search"]').fill('Back Squat')
     await page.click('button:has-text("Barbell Back Squat")')
@@ -197,8 +198,8 @@ test.describe.serial('Full User Journey', () => {
     await expect(page.getByRole('heading', { name: 'Day 3: Legs' })).toBeVisible()
 
     // Volume section
-    await expect(page.locator('text=Weekly Volume')).toBeVisible({ timeout: 5000 })
-    await expect(page.locator('text=Planned')).toBeVisible()
+    await expect(page.locator("text=This week's volume")).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('text=working sets done / planned')).toBeVisible()
   })
 
   // 6. WEEK 1 - full training week
@@ -227,7 +228,7 @@ test.describe.serial('Full User Journey', () => {
 
     // Reload and verify recorded badge
     await page.reload()
-    await expect(page.locator('text=Recorded').first()).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('text=Logged').first()).toBeVisible({ timeout: 5000 })
 
     await page.click('button:has-text("Finish")')
     await expect(page).toHaveURL('/')
@@ -381,31 +382,36 @@ test.describe.serial('Full User Journey', () => {
     await expect(page.locator('button:has-text("Flat Barbell Bench Press")')).toBeVisible()
     await expect(page.locator('button:has-text("Overhand Pull-up")')).toBeVisible()
 
-    // Click bench to see chart
+    // Click bench to see its chart and stats
     await page.click('button:has-text("Flat Barbell Bench Press")')
-    await expect(page.locator('text=Avg e1RM')).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('text=Current e1RM')).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('text=Estimated 1RM per session')).toBeVisible()
   })
 
-  // 13. NAV LINKS
+  // 13. NAV LINKS (bottom tab bar + top bar)
   test('13. Nav links work correctly', async ({ page }) => {
     await loginAndGo(page, '/progress')
 
-    // "Workout" goes to /
-    await page.click('nav >> text=Workout')
+    // Bottom tab "Today" goes to /
+    await page.click('nav >> text=Today')
     await expect(page).toHaveURL('/')
 
-    // "History" goes to /mesocycles
-    await page.click('nav >> text=History')
-    await expect(page).toHaveURL('/mesocycles')
+    // Bottom tab "Programs" lands on history until template browsing ships
+    await page.click('nav >> text=Programs')
+    await expect(page).toHaveURL('/programs/history')
+
+    // Bottom tab "Progress"
+    await page.click('nav >> text=Progress')
+    await expect(page).toHaveURL('/progress')
 
     // Logo goes to /
-    await page.click('nav >> text=LiftNotebook')
+    await page.click('header >> text=LiftNotebook')
     await expect(page).toHaveURL('/')
   })
 
   // 14. DELETE MESOCYCLE
   test('14. Delete mesocycle', async ({ page }) => {
-    await loginAndGo(page, '/mesocycles')
+    await loginAndGo(page, '/programs/history')
     await expect(page.locator('text=E2E Test Meso')).toBeVisible()
 
     page.on('dialog', dialog => dialog.accept())
@@ -433,9 +439,9 @@ test.describe.serial('Full User Journey', () => {
     await labelInputs.nth(1).fill('Lower')
 
     await page.locator('button[type="submit"]').click()
-    await page.waitForURL(/\/mesocycle\/\d+\/setup\/\d+/)
+    await page.waitForURL(/\/programs\/\d+\/setup\/\d+/)
 
-    const newMesoId = parseInt(page.url().match(/mesocycle\/(\d+)/)[1])
+    const newMesoId = parseInt(page.url().match(/programs\/(\d+)/)[1])
 
     // Setup Upper
     await page.locator('input[placeholder*="Search"]').fill('Flat Barbell')

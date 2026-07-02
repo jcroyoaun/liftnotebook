@@ -42,6 +42,11 @@ spec:
                 secretKeyRef:
                   name: liftnotebook-app-secrets
                   key: jwt-secret
+            - name: INVITE_CODE
+              valueFrom:
+                secretKeyRef:
+                  name: liftnotebook-app-secrets
+                  key: invite-code
           ports:
             - name: http
               containerPort: 4001

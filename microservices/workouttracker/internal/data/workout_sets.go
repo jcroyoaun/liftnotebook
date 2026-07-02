@@ -4,10 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"regexp"
 	"time"
 
 	"workouttracker.jcroyoaun.io/internal/validator"
 )
+
+// uuidRX validates client-generated idempotency keys before they hit the
+// uuid column (a malformed value would otherwise surface as a 500).
+var uuidRX = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 type WorkoutSet struct {
 	ID               int64     `json:"id"`
@@ -19,6 +24,7 @@ type WorkoutSet struct {
 	Reps             int       `json:"reps"`
 	RIR              *int      `json:"rir"`
 	Recorded         bool      `json:"recorded"`
+	ClientID         *string   `json:"client_id,omitempty"`
 	CreatedAt        time.Time `json:"-"`
 	Version          int32     `json:"version,omitzero"`
 }
@@ -34,6 +40,9 @@ func ValidateWorkoutSet(v *validator.Validator, s *WorkoutSet) {
 	v.Check(s.Reps >= 1, "reps", "must be at least 1")
 	if s.RIR != nil {
 		v.Check(*s.RIR >= 0 && *s.RIR <= 10, "rir", "must be between 0 and 10")
+	}
+	if s.ClientID != nil {
+		v.Check(uuidRX.MatchString(*s.ClientID), "client_id", "must be a valid UUID")
 	}
 }
 
@@ -52,18 +61,24 @@ func (m WorkoutSetModel) Insert(set *WorkoutSet) error {
 }
 
 func (m WorkoutSetModel) InsertForUser(set *WorkoutSet, userID int64) error {
+	// A replayed client_id (offline queue retry) upserts instead of
+	// duplicating the set.
 	query := `
-		INSERT INTO workout_sets (workout_session_id, exercise_id, set_number, weight, reps, rir, recorded)
-		SELECT $1, $2, $3, $4, $5, $6, $7
+		INSERT INTO workout_sets (workout_session_id, exercise_id, set_number, weight, reps, rir, recorded, client_id)
+		SELECT $1, $2, $3, $4, $5, $6, $7, $8
 		FROM workout_sessions ws
-		WHERE ws.id = $1 AND ws.user_id = $8
+		WHERE ws.id = $1 AND ws.user_id = $9
+		ON CONFLICT (client_id) WHERE client_id IS NOT NULL
+		DO UPDATE SET weight = EXCLUDED.weight, reps = EXCLUDED.reps, rir = EXCLUDED.rir,
+		              recorded = EXCLUDED.recorded, version = workout_sets.version + 1
+		WHERE workout_sets.workout_session_id = EXCLUDED.workout_session_id
 		RETURNING id, created_at, version`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	err := m.DB.QueryRowContext(ctx, query,
-		set.WorkoutSessionID, set.ExerciseID, set.SetNumber, set.Weight, set.Reps, set.RIR, set.Recorded, userID,
+		set.WorkoutSessionID, set.ExerciseID, set.SetNumber, set.Weight, set.Reps, set.RIR, set.Recorded, set.ClientID, userID,
 	).Scan(&set.ID, &set.CreatedAt, &set.Version)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -78,7 +93,7 @@ func (m WorkoutSetModel) InsertForUser(set *WorkoutSet, userID int64) error {
 func (m WorkoutSetModel) GetForSession(sessionID int64) ([]WorkoutSet, error) {
 	query := `
 		SELECT ws.id, ws.workout_session_id, ws.exercise_id, e.name,
-		       ws.set_number, ws.weight, ws.reps, ws.rir, ws.recorded, ws.created_at, ws.version
+		       ws.set_number, ws.weight, ws.reps, ws.rir, ws.recorded, ws.client_id, ws.created_at, ws.version
 		FROM workout_sets ws
 		JOIN exercises e ON ws.exercise_id = e.id
 		WHERE ws.workout_session_id = $1
@@ -98,7 +113,7 @@ func (m WorkoutSetModel) GetForSession(sessionID int64) ([]WorkoutSet, error) {
 		var s WorkoutSet
 		err := rows.Scan(
 			&s.ID, &s.WorkoutSessionID, &s.ExerciseID, &s.ExerciseName,
-			&s.SetNumber, &s.Weight, &s.Reps, &s.RIR, &s.Recorded, &s.CreatedAt, &s.Version,
+			&s.SetNumber, &s.Weight, &s.Reps, &s.RIR, &s.Recorded, &s.ClientID, &s.CreatedAt, &s.Version,
 		)
 		if err != nil {
 			return nil, err

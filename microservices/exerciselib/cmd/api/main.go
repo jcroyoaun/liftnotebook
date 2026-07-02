@@ -38,6 +38,9 @@ type config struct {
 		burst   int
 		enabled bool
 	}
+	// adminAPIKey guards all mutating endpoints. When empty, writes are
+	// rejected outright (fail closed) rather than left open.
+	adminAPIKey string
 }
 
 type application struct {
@@ -64,6 +67,8 @@ func main() {
 	flag.Float64Var(&cfg.limiter.rps, "limiter-rps", 2, "Rate limiter maximum requests per second")
 	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
 	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
+
+	flag.StringVar(&cfg.adminAPIKey, "admin-api-key", os.Getenv("ADMIN_API_KEY"), "Admin API key required for write endpoints")
 
 	flag.Parse()
 

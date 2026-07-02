@@ -34,7 +34,7 @@ export default function MesocycleHistory() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-slate-800">Mesocycle History</h2>
-        <Link to="/mesocycle/new"
+        <Link to="/programs/new"
           className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700">
           New
         </Link>
@@ -47,7 +47,7 @@ export default function MesocycleHistory() {
           {mesocycles.map(m => (
             <div key={m.id} className="bg-white rounded-xl border border-slate-200 p-4 hover:bg-slate-50">
               <div className="flex items-center justify-between">
-                <Link to={`/mesocycle/${m.id}/volume`} className="flex-1 min-w-0">
+                <Link to={`/programs/${m.id}/volume`} className="flex-1 min-w-0">
                   <h3 className="font-semibold text-slate-800">{m.name}</h3>
                   <p className="text-xs text-slate-500">
                     {m.days_per_week} days/week

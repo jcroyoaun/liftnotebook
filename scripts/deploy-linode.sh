@@ -5,10 +5,19 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 KUBECONFIG_PATH="${KUBECONFIG_PATH:-${KUBECONFIG:-}}"
 IMAGE_REGISTRY="${IMAGE_REGISTRY:-ghcr.io}"
 IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-${DOCKER_REPO:-jcroyoaun}}"
-IMAGE_TAG="${IMAGE_TAG:-$(date +%Y%m%d-%H%M%S)}"
+IMAGE_TAG_PROVIDED="false"
+if [[ -n "${IMAGE_TAG:-}" ]]; then
+  IMAGE_TAG_PROVIDED="true"
+else
+  IMAGE_TAG=""
+fi
 APP_HOST="${APP_HOST:-liftnotebook.totalcomp.mx}"
 EXERCISELIB_HOST="${EXERCISELIB_HOST:-exerciselib.totalcomp.mx}"
 BUILD_IMAGES="${BUILD_IMAGES:-true}"
+# Fresh environments only: creates schemas and loads the exercise catalog
+# seed data. Routine deploys skip this — workouttracker applies its own
+# schema migrations at startup.
+RUN_DB_BOOTSTRAP="${RUN_DB_BOOTSTRAP:-false}"
 
 require_tool() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -71,18 +80,51 @@ ensure_bootstrap_configmaps() {
 
 ensure_liftnotebook_secret() {
   local jwt_secret="${LIFTNOTEBOOK_JWT_SECRET:-}"
-  if [[ -z "${jwt_secret}" ]]; then
-    if kubectl --kubeconfig "${KUBECONFIG_PATH}" get secret liftnotebook-app-secrets -n liftnotebook >/dev/null 2>&1; then
-      echo "reusing existing liftnotebook-app-secrets secret" >&2
-      return 0
-    fi
+  local invite_code="${LIFTNOTEBOOK_INVITE_CODE:-}"
 
+  # Reuse values from an existing secret for anything not supplied explicitly,
+  # so redeploys never rotate credentials by accident.
+  if kubectl --kubeconfig "${KUBECONFIG_PATH}" get secret liftnotebook-app-secrets -n liftnotebook >/dev/null 2>&1; then
+    if [[ -z "${jwt_secret}" ]]; then
+      jwt_secret="$(kubectl --kubeconfig "${KUBECONFIG_PATH}" -n liftnotebook get secret liftnotebook-app-secrets -o jsonpath='{.data.jwt-secret}' | base64 -d)"
+    fi
+    if [[ -z "${invite_code}" ]]; then
+      invite_code="$(kubectl --kubeconfig "${KUBECONFIG_PATH}" -n liftnotebook get secret liftnotebook-app-secrets -o jsonpath='{.data.invite-code}' | base64 -d || true)"
+    fi
+  fi
+
+  if [[ -z "${jwt_secret}" ]]; then
     jwt_secret="$(openssl rand -hex 32)"
     echo "generated new JWT secret for liftnotebook-app-secrets" >&2
   fi
 
+  if [[ -z "${invite_code}" ]]; then
+    invite_code="$(openssl rand -hex 8)"
+    echo "generated new invite code for liftnotebook-app-secrets" >&2
+    echo "retrieve it with: kubectl -n liftnotebook get secret liftnotebook-app-secrets -o jsonpath='{.data.invite-code}' | base64 -d" >&2
+  fi
+
   kubectl --kubeconfig "${KUBECONFIG_PATH}" -n liftnotebook create secret generic liftnotebook-app-secrets \
     --from-literal=jwt-secret="${jwt_secret}" \
+    --from-literal=invite-code="${invite_code}" \
+    --dry-run=client -o yaml | kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f -
+}
+
+ensure_exerciselib_secret() {
+  local admin_api_key="${EXERCISELIB_ADMIN_API_KEY:-}"
+  if [[ -z "${admin_api_key}" ]]; then
+    if kubectl --kubeconfig "${KUBECONFIG_PATH}" get secret exerciselib-app-secrets -n exerciselib >/dev/null 2>&1; then
+      echo "reusing existing exerciselib-app-secrets secret" >&2
+      return 0
+    fi
+
+    admin_api_key="$(openssl rand -hex 32)"
+    echo "generated new admin API key for exerciselib-app-secrets" >&2
+    echo "retrieve it later with: kubectl -n exerciselib get secret exerciselib-app-secrets -o jsonpath='{.data.admin-api-key}' | base64 -d" >&2
+  fi
+
+  kubectl --kubeconfig "${KUBECONFIG_PATH}" -n exerciselib create secret generic exerciselib-app-secrets \
+    --from-literal=admin-api-key="${admin_api_key}" \
     --dry-run=client -o yaml | kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f -
 }
 
@@ -95,6 +137,10 @@ apply_bootstrap_jobs() {
 }
 
 build_and_push_images() {
+  if [[ -z "${IMAGE_TAG}" ]]; then
+    IMAGE_TAG="$(date +%Y%m%d-%H%M%S)"
+  fi
+
   docker buildx build --platform linux/amd64 --push \
     -t "${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/exerciselib:${IMAGE_TAG}" \
     "${ROOT_DIR}/microservices/exerciselib"
@@ -130,6 +176,48 @@ apply_workloads() {
   webapp_image_name="${webapp_image_name%:*}"
 
   cat > "${overlay_dir}/kustomization.yaml" <<EOF
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../environments/linode/apps
+  - ../environments/linode/ingress
+patches:
+  - target:
+      kind: Gateway
+      name: exerciselib-gateway
+      namespace: exerciselib
+    patch: |-
+      - op: replace
+        path: /spec/servers/0/hosts/0
+        value: ${EXERCISELIB_HOST}
+  - target:
+      kind: VirtualService
+      name: exerciselib
+      namespace: exerciselib
+    patch: |-
+      - op: replace
+        path: /spec/hosts/0
+        value: ${EXERCISELIB_HOST}
+  - target:
+      kind: Gateway
+      name: liftnotebook-gateway
+      namespace: liftnotebook
+    patch: |-
+      - op: replace
+        path: /spec/servers/0/hosts/0
+        value: ${APP_HOST}
+  - target:
+      kind: VirtualService
+      name: liftnotebook
+      namespace: liftnotebook
+    patch: |-
+      - op: replace
+        path: /spec/hosts/0
+        value: ${APP_HOST}
+EOF
+
+  if [[ "${BUILD_IMAGES}" == "true" || "${IMAGE_TAG_PROVIDED}" == "true" ]]; then
+    cat > "${overlay_dir}/kustomization.yaml" <<EOF
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
@@ -182,6 +270,7 @@ patches:
         path: /spec/hosts/0
         value: ${APP_HOST}
 EOF
+  fi
 
   kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -k "${overlay_dir}"
 }
@@ -227,9 +316,13 @@ wait_for_postgres liftnotebook liftnotebook-db
 wait_for_secret exerciselib exerciselib-app.exerciselib-db.credentials.postgresql.acid.zalan.do
 wait_for_secret liftnotebook liftnotebook-app.liftnotebook-db.credentials.postgresql.acid.zalan.do
 
-ensure_bootstrap_configmaps
 ensure_liftnotebook_secret
-apply_bootstrap_jobs
+ensure_exerciselib_secret
+
+if [[ "${RUN_DB_BOOTSTRAP}" == "true" ]]; then
+  ensure_bootstrap_configmaps
+  apply_bootstrap_jobs
+fi
 
 apply_workloads
 
