@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: libconsole
-          image: ghcr.io/jcroyoaun/libconsole:sha-968b434796ac
+          image: ghcr.io/jcroyoaun/libconsole:sha-57b1b57351d4
           imagePullPolicy: Always
           ports:
             - name: http
