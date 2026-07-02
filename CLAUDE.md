@@ -95,10 +95,33 @@ are just different per-exercise target values.
 ## Roadmap (approved plan: ~/.claude/plans/cryptic-wobbling-starfish.md)
 
 - ✅ P0 hardening + P1 training core (progression engine, offline logger, charts)
-- P2: program templates + seeded "Tremendous" programs (2-sets-to-failure splits)
-- P3: exercise library enrichment (video/instructions), body metrics/photos/PRs,
-  retire exerciselib. The exercise detail modal is the last old-style UI — becomes
-  a full page here.
+- ✅ Cobalt redesign + liftnotebook.app domain move
+- ✅ Training UX batch: fixed dashboard day order, minimizable workout +
+  ActiveWorkoutBar, read-only /sessions/:id + history, planned weekly volume,
+  admin role (users.role + ADMIN_EMAILS), +16 catalog exercises + adductors
+  body part + mapping repairs
+
+### Next up — owner picks from this menu (routine fires 2026-07-02 9am)
+
+1. Unify exercise catalog into workouttracker, retire exerciselib service +
+   its Postgres (TOP PICK — console writes currently land in a separate DB
+   and never reach the app; also frees cluster resources). Supersedes the
+   "retire exerciselib" P3 bullet.
+2. Program templates (P2): shareable pre-built blocks friends can pick in-app.
+   Owner provides the template programs (exercise lists per day, house style).
+3. Mid-workout exercise swap (deferred from P1).
+4. Rest-timer push notification when rest ends, screen off (PWA web push).
+5. Edit-past-workout escape hatch + session notes editing (needs
+   PATCH /v1/sessions/:id).
+- Optional add-on: chart kit — src/components/charts/ (shared ChartTooltip +
+  TrendChart/HBarChart wrappers baking in theme/grid/axis defaults). The
+  chartTheme.js token layer is solid; the gap is hand-rolled Recharts markup
+  duplicated per page (3 tooltip components across 2 pages). Do it right
+  before building the PR/metrics dashboards.
+
+### Later phases
+
+- P3: exercise library enrichment (video/instructions — console needs a video
+  URL field once the catalog is unified), body metrics/photos/PRs. The
+  exercise detail modal is the last old-style UI — becomes a full page here.
 - P4: nutrition (TDEE, intake log, recipes)
-- Deferred from P1: mid-workout exercise swap, session notes editing (needs a
-  PATCH /v1/sessions/:id endpoint).
