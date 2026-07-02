@@ -13,6 +13,7 @@
     "test:e2e:headed": "npx playwright test --headed"
   },
   "dependencies": {
+    "@fontsource-variable/fraunces": "^5.2.9",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-query-persist-client": "^5.101.2",
     "idb-keyval": "^6.2.6",

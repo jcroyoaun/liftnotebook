@@ -4,12 +4,17 @@ const RIR_CHIPS = [0, 1, 2, 3, 4]
 
 // One working set: big touch targets, steppers instead of keyboards, RIR as
 // tappable chips. Every interaction commits immediately (optimistic +
-// debounced sync) — nothing waits for blur.
+// debounced sync) — nothing waits for blur. Logging a set is the app's
+// signature moment: the row "stamps" green with a spring-in check.
 export default function SetRow({ set, onChange, onRecord, onDelete, canDelete }) {
   return (
-    <div className={`px-3 py-2 border-b border-slate-50 ${set.recorded ? 'bg-green-50' : ''}`}>
+    <div
+      className={`border-b border-line px-3 py-2.5 transition-colors duration-300 ${
+        set.recorded ? 'bg-ok-wash' : ''
+      }`}
+    >
       <div className="flex items-center gap-2">
-        <div className="w-5 shrink-0 text-xs text-slate-400 text-center">{set.set_number}</div>
+        <div className="w-5 shrink-0 text-center text-xs text-ink-4 tabular-nums">{set.set_number}</div>
 
         <NumberStepper
           className="flex-1"
@@ -27,22 +32,31 @@ export default function SetRow({ set, onChange, onRecord, onDelete, canDelete })
           min={1}
           onChange={(v) => onChange({ ...set, reps: v })}
         />
+        <button
+          type="button"
+          onClick={() => onDelete(set)}
+          disabled={!canDelete}
+          aria-label="delete set"
+          className="grid h-11 w-8 shrink-0 place-items-center rounded-lg text-ink-4 transition-colors active:text-danger disabled:opacity-30"
+        >
+          ✕
+        </button>
       </div>
 
-      <div className="flex items-center justify-between mt-1.5 pl-7">
+      <div className="mt-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1">
-          <span className="text-[11px] text-slate-400 mr-1">RIR</span>
+          <span className="mr-0.5 w-5 text-[10px] font-medium uppercase tracking-wide text-ink-4">RIR</span>
           {RIR_CHIPS.map((rir) => (
             <button
               key={rir}
               type="button"
               onClick={() => onChange({ ...set, rir: set.rir === rir ? null : rir })}
-              className={`h-8 w-8 rounded-full text-xs font-medium ${
+              className={`h-11 w-11 rounded-full text-xs font-medium transition-all active:scale-95 ${
                 set.rir === rir
                   ? rir === 0
-                    ? 'bg-red-600 text-white'
-                    : 'bg-blue-600 text-white'
-                  : 'bg-slate-100 text-slate-500 active:bg-slate-200'
+                    ? 'bg-accent-solid font-semibold text-on-accent'
+                    : 'bg-ink font-semibold text-page'
+                  : 'bg-sunken text-ink-3 active:bg-line'
               }`}
             >
               {rir}
@@ -50,34 +64,26 @@ export default function SetRow({ set, onChange, onRecord, onDelete, canDelete })
           ))}
         </div>
 
-        <div className="flex items-center gap-1">
-          {!set.recorded ? (
-            <button
-              type="button"
-              onClick={() => onRecord(set)}
-              className="h-8 px-4 rounded-lg bg-green-600 text-white text-xs font-semibold active:bg-green-700"
-            >
-              Done
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onChange({ ...set, recorded: false })}
-              className="h-8 px-3 rounded-lg text-green-700 text-xs font-medium"
-            >
-              ✓ Logged
-            </button>
-          )}
+        {!set.recorded ? (
           <button
             type="button"
-            onClick={() => onDelete(set)}
-            disabled={!canDelete}
-            aria-label="delete set"
-            className="h-8 w-8 rounded text-slate-300 active:text-red-500 disabled:opacity-30"
+            onClick={() => {
+              navigator.vibrate?.(35)
+              onRecord(set)
+            }}
+            className="h-11 shrink-0 rounded-btn bg-accent-solid px-4 text-xs font-semibold text-on-accent transition-all active:scale-[0.96] active:bg-accent-press"
           >
-            ✕
+            Done
           </button>
-        </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onChange({ ...set, recorded: false })}
+            className="h-11 shrink-0 rounded-btn px-3 text-xs font-semibold text-ok"
+          >
+            <span className="inline-block animate-stamp">✓</span> Logged
+          </button>
+        )}
       </div>
     </div>
   )

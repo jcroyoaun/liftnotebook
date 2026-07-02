@@ -1,27 +1,190 @@
 @import "tailwindcss";
+@import "@fontsource-variable/fraunces/opsz.css";
+@import "@fontsource-variable/fraunces/opsz-italic.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ==========================================================================
+   Iron Ledger — the design system's single source of truth.
+
+   Raw values live on :root (light) and .dark; semantic utility classes are
+   minted from them via @theme inline, so every token flips with the theme
+   automatically — components never use dark: prefixes for color.
+
+   Consume ONLY semantic classes: bg-page/card/raised/sunken, text-ink/-2/-3,
+   border-line/-2, text-accent, bg-accent-solid, text-ok/danger/warn,
+   rounded-card/btn/field/sheet, shadow-card/raised/sheet, font-display.
+   Stock Tailwind color scales are disabled below — a stray blue-600 will
+   simply not compile. Chart colors live in src/lib/chartTheme.js only.
+   All text pairs computed ≥ 4.5:1 (see repo history: design-session audit).
+   ========================================================================== */
+
+:root {
+  /* surfaces — warm paper */
+  --surface-page: #f6f4ef;
+  --surface-card: #fffefb;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f0ede6;
+  /* ink */
+  --ink-1: #1c1917;
+  --ink-2: #57534e;
+  --ink-3: #6d6660;
+  --ink-4: #a8a29e; /* decorative/placeholder only — below AA, never body text */
+  /* hairlines */
+  --line-1: #e7e2d9;
+  --line-2: #d8d2c6;
+  /* accent — oxblood */
+  --accent-fg: #8c2b1f;    /* accent as text/icon */
+  --accent-solid: #8c2b1f; /* accent as fill */
+  --accent-press: #72211a;
+  --on-accent: #ffffff;
+  --wash: #f7ebe7;
+  /* status */
+  --ok-fg: #3f6212;
+  --ok-wash: #eef3e3;
+  --danger-fg: #bf3226;
+  --danger-solid: #bf3226;
+  --danger-press: #a02a20;
+  --danger-wash: #faeae8;
+  --warn-fg: #92400e;
+  --warn-wash: #fdf3e3;
+  /* elevation — hairline + whisper of shadow; borders do the work */
+  --elev-card: 0 1px 2px rgba(28, 25, 23, 0.05);
+  --elev-raised: 0 4px 16px rgba(28, 25, 23, 0.1);
+  --elev-sheet: 0 -8px 32px rgba(28, 25, 23, 0.18);
+}
+
+.dark {
+  /* surfaces — midnight ledger, warm charcoal */
+  --surface-page: #171412;
+  --surface-card: #201c19;
+  --surface-raised: #292420;
+  --surface-sunken: #1b1815;
+  /* parchment ink */
+  --ink-1: #ece7df;
+  --ink-2: #b3aca1;
+  --ink-3: #948c80;
+  --ink-4: #6b6459;
+  --line-1: #35302a;
+  --line-2: #453e36;
+  /* oxblood, lifted for dark */
+  --accent-fg: #e08a76;
+  --accent-solid: #9c3a2b;
+  --accent-press: #b04635;
+  --on-accent: #ffffff;
+  --wash: #2e211d;
+  --ok-fg: #8fbf6d;
+  --ok-wash: #222a1a;
+  --danger-fg: #e8796a;
+  --danger-solid: #bf3226;
+  --danger-press: #d0473a;
+  --danger-wash: #33201d;
+  --warn-fg: #e0a860;
+  --warn-wash: #2f2617;
+  --elev-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --elev-raised: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --elev-sheet: 0 -8px 32px rgba(0, 0, 0, 0.5);
+}
 
 @theme {
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
+  /* purge stock palettes — semantic tokens below are the only colors */
+  --color-*: initial;
+  --color-black: #000000;
+  --color-white: #ffffff;
+
+  --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Oxygen', sans-serif;
+
+  --radius-card: 14px;
+  --radius-btn: 10px;
+  --radius-field: 10px;
+  --radius-sheet: 20px;
+
+  --animate-stamp: stamp 0.45s cubic-bezier(0.2, 1.4, 0.3, 1) both;
+  --animate-rise: rise 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+  --animate-pop: pop 0.35s cubic-bezier(0.2, 1.4, 0.3, 1) both;
+  --animate-fade-in: fade-in 0.2s ease-out both;
+
+  @keyframes stamp {
+    0% { transform: scale(1.7) rotate(-8deg); opacity: 0; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+  @keyframes rise {
+    0% { transform: translateY(14px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes pop {
+    0% { transform: scale(0.92); }
+    100% { transform: scale(1); }
+  }
+  @keyframes fade-in {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+}
+
+@theme inline {
+  --color-page: var(--surface-page);
+  --color-card: var(--surface-card);
+  --color-raised: var(--surface-raised);
+  --color-sunken: var(--surface-sunken);
+  --color-ink: var(--ink-1);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-line: var(--line-1);
+  --color-line-2: var(--line-2);
+  --color-accent: var(--accent-fg);
+  --color-accent-solid: var(--accent-solid);
+  --color-accent-press: var(--accent-press);
+  --color-on-accent: var(--on-accent);
+  --color-wash: var(--wash);
+  --color-ok: var(--ok-fg);
+  --color-ok-wash: var(--ok-wash);
+  --color-danger: var(--danger-fg);
+  --color-danger-solid: var(--danger-solid);
+  --color-danger-press: var(--danger-press);
+  --color-danger-wash: var(--danger-wash);
+  --color-warn: var(--warn-fg);
+  --color-warn-wash: var(--warn-wash);
+
+  --shadow-card: var(--elev-card);
+  --shadow-raised: var(--elev-raised);
+  --shadow-sheet: var(--elev-sheet);
 }
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', sans-serif;
+  font-family: var(--font-sans);
+  background-color: var(--surface-page);
+  color: var(--ink-1);
   -webkit-font-smoothing: antialiased;
-  background-color: #f8fafc;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* display face wants optical sizing + tight tracking at heading sizes */
+.font-display {
+  font-optical-sizing: auto;
+  letter-spacing: -0.015em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
 }
 
 @media (max-width: 640px) {
   html {
     font-size: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

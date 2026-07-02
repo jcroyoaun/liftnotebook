@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { api } from '../api/client'
 import ExerciseDetailButton from '../components/ExerciseDetailButton'
 import PageHeader from '../components/ui/PageHeader'
+import Input from '../components/ui/Input'
+import Button from '../components/ui/Button'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useToast } from '../lib/toastContext'
 
@@ -152,14 +154,14 @@ export default function SetupDayExercises() {
       <PageHeader title={day?.label || `Day ${dayId}`} subtitle="Choose exercises and set targets" backTo="/" />
 
       {/* Day tabs */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex flex-wrap items-center gap-2">
         {days.map((d, i) => (
           <Link key={d.id}
             to={`/programs/${mesoId}/setup/${d.id}`}
-            className={`text-xs px-3.5 py-2 rounded-full font-medium transition-colors ${
+            className={`min-h-10 rounded-full px-3.5 py-2 text-xs font-medium transition-all active:scale-[0.97] ${
               i === currentIdx
-                ? 'bg-blue-600 text-white'
-                : 'bg-white border border-slate-200 text-slate-600 active:bg-slate-50'
+                ? 'bg-ink text-page'
+                : 'border border-line-2 bg-card text-ink-2 active:bg-sunken'
             }`}>
             {d.label}
           </Link>
@@ -168,14 +170,14 @@ export default function SetupDayExercises() {
 
       {/* Volume preview - day + weekly cumulative */}
       {(dayVolume.length > 0 || weekVolume.length > 0) && (
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-slate-800 mb-2">Volume preview</h3>
+        <div className="rounded-card border border-line bg-card p-4 shadow-card">
+          <h3 className="mb-2 text-sm font-semibold text-ink">Volume preview</h3>
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-slate-400">
-                <th className="pr-3 py-0.5 font-medium">Muscle</th>
-                <th className="px-2 py-0.5 font-medium text-right">This day</th>
-                <th className="pl-2 py-0.5 font-medium text-right">Week total</th>
+              <tr className="text-left text-ink-3">
+                <th className="py-0.5 pr-3 font-medium">Muscle</th>
+                <th className="px-2 py-0.5 text-right font-medium">This day</th>
+                <th className="py-0.5 pl-2 text-right font-medium">Week total</th>
               </tr>
             </thead>
             <tbody>
@@ -183,11 +185,11 @@ export default function SetupDayExercises() {
                 const daySets = dayVolumeMap[bp.body_part] || 0
                 return (
                   <tr key={bp.body_part}>
-                    <td className="pr-3 py-1 text-slate-600 capitalize">{bp.body_part}</td>
-                    <td className="px-2 py-1 text-right tabular-nums text-slate-700">
+                    <td className="py-1 pr-3 capitalize text-ink-2">{bp.body_part}</td>
+                    <td className="px-2 py-1 text-right tabular-nums text-ink-2">
                       {daySets ? Math.round(daySets * 10) / 10 : '–'}
                     </td>
-                    <td className="pl-2 py-1 text-right tabular-nums font-semibold text-slate-900">
+                    <td className="py-1 pl-2 text-right font-semibold tabular-nums text-ink">
                       {Math.round(bp.total_sets * 10) / 10}
                     </td>
                   </tr>
@@ -201,32 +203,32 @@ export default function SetupDayExercises() {
       {/* Selected exercises */}
       <div className="space-y-2">
         {exercises.map((ex, i) => (
-          <div key={`${ex.exercise_id}-${i}`} className="bg-white rounded-xl border border-slate-200 px-3 py-2.5">
+          <div key={`${ex.exercise_id}-${i}`} className="rounded-card border border-line bg-card px-3 py-2.5 shadow-card">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400 w-5 shrink-0 text-center">{i + 1}</span>
+              <span className="w-5 shrink-0 text-center text-xs text-ink-4 tabular-nums">{i + 1}</span>
               <ExerciseDetailButton
                 exerciseId={ex.exercise_id}
-                className="flex-1 min-w-0 text-left text-sm font-medium text-slate-800 hover:text-blue-600 truncate"
+                className="min-w-0 flex-1 truncate text-left text-sm font-medium text-ink transition-colors hover:text-accent"
               >
                 {ex.exercise_name}
               </ExerciseDetailButton>
               <button onClick={() => removeExercise(i)} aria-label={`remove ${ex.exercise_name}`}
-                className="p-1.5 text-slate-300 active:text-red-500 shrink-0">
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink-4 transition-colors active:bg-danger-wash active:text-danger">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <div className="flex items-center justify-between mt-1.5 pl-7">
-              <span className="text-[11px] text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">
+            <div className="mt-1.5 flex items-center justify-between pl-7">
+              <span className="rounded-full bg-sunken px-2 py-0.5 text-[11px] text-ink-2">
                 {ex.target_rep_range_low ?? 8}–{ex.target_rep_range_high ?? 12} reps @ RIR {ex.target_rir ?? 0}
               </span>
               <div className="flex items-center gap-1">
                 <button onClick={() => updateSets(i, ex.target_sets - 1)} aria-label="fewer sets"
-                  className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 text-sm active:bg-slate-200">−</button>
-                <span className="text-sm w-10 text-center tabular-nums">{ex.target_sets} <span className="text-[10px] text-slate-400">sets</span></span>
+                  className="h-9 w-9 rounded-field bg-sunken text-sm text-ink-2 transition-all active:scale-95 active:bg-line">−</button>
+                <span className="w-10 text-center text-sm tabular-nums text-ink">{ex.target_sets} <span className="text-[10px] text-ink-4">sets</span></span>
                 <button onClick={() => updateSets(i, ex.target_sets + 1)} aria-label="more sets"
-                  className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 text-sm active:bg-slate-200">+</button>
+                  className="h-9 w-9 rounded-field bg-sunken text-sm text-ink-2 transition-all active:scale-95 active:bg-line">+</button>
               </div>
             </div>
           </div>
@@ -235,17 +237,20 @@ export default function SetupDayExercises() {
 
       {/* Search and add */}
       <div>
-        <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+        <Input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
           placeholder="Search exercises to add..."
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        />
         {search && (
-          <div className="mt-1 bg-white border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
-            {filtered.length === 0 && <p className="p-3 text-sm text-slate-400">No matches</p>}
+          <div className="mt-1 max-h-48 overflow-y-auto rounded-field border border-line bg-card shadow-raised">
+            {filtered.length === 0 && <p className="p-3 text-sm text-ink-3">No matches</p>}
             {filtered.map(ex => (
               <button key={ex.id} onClick={() => addExercise(ex)}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex justify-between">
+                className="flex min-h-11 w-full items-center justify-between px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-wash active:bg-wash">
                 <span>{ex.name}</span>
-                <span className="text-xs text-slate-400">{ex.movement_pattern}</span>
+                <span className="text-xs text-ink-4">{ex.movement_pattern}</span>
               </button>
             ))}
           </div>
@@ -254,14 +259,12 @@ export default function SetupDayExercises() {
 
       {/* Action buttons */}
       <div className="flex gap-2">
-        <button onClick={() => navigate('/')}
-          className="px-4 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-medium active:bg-slate-50">
+        <Button variant="secondary" onClick={() => navigate('/')} className="min-h-12 px-5">
           Done
-        </button>
-        <button onClick={save} disabled={saving}
-          className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-sm font-semibold active:bg-blue-700 disabled:opacity-50">
+        </Button>
+        <Button onClick={save} disabled={saving} className="min-h-12 flex-1">
           {saving ? 'Saving…' : currentIdx < days.length - 1 ? `Save & Next (${days[currentIdx + 1]?.label})` : 'Save & Finish'}
-        </button>
+        </Button>
       </div>
     </div>
   )

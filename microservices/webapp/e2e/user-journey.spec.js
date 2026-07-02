@@ -207,7 +207,7 @@ test.describe.serial('Full User Journey', () => {
     await loginAndGo(page, '/')
 
     // Start Push workout
-    const pushDay = page.locator('[class*="rounded-xl"]').filter({ hasText: 'Day 1: Push' })
+    const pushDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 1: Push' })
     await pushDay.locator('button:has-text("Start Workout")').click()
     await page.waitForURL(/\/workout\/\d+/)
 
@@ -236,7 +236,7 @@ test.describe.serial('Full User Journey', () => {
 
   test('6b. Week 1 Pull workout', async ({ page }) => {
     await loginAndGo(page, '/')
-    const pullDay = page.locator('[class*="rounded-xl"]').filter({ hasText: 'Day 2: Pull' })
+    const pullDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 2: Pull' })
     await pullDay.locator('button:has-text("Start Workout")').click()
     await page.waitForURL(/\/workout\/\d+/)
     const sessionId = parseInt(page.url().match(/workout\/(\d+)/)[1])
@@ -250,7 +250,7 @@ test.describe.serial('Full User Journey', () => {
 
   test('6c. Week 1 Legs workout', async ({ page }) => {
     await loginAndGo(page, '/')
-    const legsDay = page.locator('[class*="rounded-xl"]').filter({ hasText: 'Day 3: Legs' })
+    const legsDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 3: Legs' })
     await legsDay.locator('button:has-text("Start Workout")').click()
     await page.waitForURL(/\/workout\/\d+/)
     const sessionId = parseInt(page.url().match(/workout\/(\d+)/)[1])
@@ -281,7 +281,7 @@ test.describe.serial('Full User Journey', () => {
   // 8. WEEK 2 - progression
   test('8a. Week 2 Push workout (heavier)', async ({ page }) => {
     await loginAndGo(page, '/')
-    const pushDay = page.locator('[class*="rounded-xl"]').filter({ hasText: 'Day 1: Push' })
+    const pushDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 1: Push' })
     await pushDay.locator('button:has-text("Start Workout")').click()
     await page.waitForURL(/\/workout\/\d+/)
     const sessionId = parseInt(page.url().match(/workout\/(\d+)/)[1])
@@ -295,7 +295,7 @@ test.describe.serial('Full User Journey', () => {
 
   test('8b. Week 2 Pull workout', async ({ page }) => {
     await loginAndGo(page, '/')
-    const pullDay = page.locator('[class*="rounded-xl"]').filter({ hasText: 'Day 2: Pull' })
+    const pullDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 2: Pull' })
     await pullDay.locator('button:has-text("Start Workout")').click()
     await page.waitForURL(/\/workout\/\d+/)
     const sessionId = parseInt(page.url().match(/workout\/(\d+)/)[1])
@@ -309,7 +309,7 @@ test.describe.serial('Full User Journey', () => {
 
   test('8c. Week 2 Legs workout', async ({ page }) => {
     await loginAndGo(page, '/')
-    const legsDay = page.locator('[class*="rounded-xl"]').filter({ hasText: 'Day 3: Legs' })
+    const legsDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 3: Legs' })
     await legsDay.locator('button:has-text("Start Workout")').click()
     await page.waitForURL(/\/workout\/\d+/)
     const sessionId = parseInt(page.url().match(/workout\/(\d+)/)[1])
@@ -353,7 +353,7 @@ test.describe.serial('Full User Journey', () => {
     const chestBefore = (before.volume || []).find(bp => bp.body_part === 'chest')?.total_sets || 0
 
     await loginAndGo(page, '/')
-    const pushDay = page.locator('[class*="rounded-xl"]').filter({ hasText: 'Day 1: Push' })
+    const pushDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 1: Push' })
     await pushDay.locator('button:has-text("Start Workout")').click()
     await page.waitForURL(/\/workout\/\d+/)
     const sessionId = parseInt(page.url().match(/workout\/(\d+)/)[1])

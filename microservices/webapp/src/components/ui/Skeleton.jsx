@@ -1,6 +1,6 @@
 // Pulse-placeholder loading states, replacing bare "Loading..." text.
 export function Skeleton({ className = '' }) {
-  return <div className={`animate-pulse rounded-lg bg-slate-200/70 ${className}`} />
+  return <div className={`animate-pulse rounded-lg bg-line/60 ${className}`} />
 }
 
 export function PageSkeleton() {

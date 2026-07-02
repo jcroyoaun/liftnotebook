@@ -5,6 +5,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import './index.css'
 import App from './App.jsx'
 import { queryClient, idbPersister } from './lib/queryClient'
+import { ThemeProvider } from './lib/theme'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -13,9 +14,11 @@ createRoot(document.getElementById('root')).render(
       persistOptions={{ persister: idbPersister, maxAge: 1000 * 60 * 60 * 24 * 3 }}
       onSuccess={() => queryClient.resumePausedMutations()}
     >
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </ThemeProvider>
     </PersistQueryClientProvider>
   </StrictMode>,
 )

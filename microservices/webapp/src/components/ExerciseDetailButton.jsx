@@ -9,7 +9,7 @@ export default function ExerciseDetailButton({ exerciseId, className, children, 
       <button type="button" onClick={() => setOpen(true)} className={className} title={title}>
         {children}
       </button>
-      {open && <ExerciseDetailModal exerciseId={exerciseId} onClose={() => setOpen(false)} />}
+      {open && <ExerciseDetailModal key={exerciseId} exerciseId={exerciseId} onClose={() => setOpen(false)} />}
     </>
   )
 }

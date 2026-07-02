@@ -77,12 +77,12 @@ export default function RestTimer({ endsAt, onDismiss, onAdjust }) {
 
   return (
     <div
-      className={`fixed bottom-0 inset-x-0 z-40 border-t px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex items-center justify-between ${
-        done ? 'bg-green-600 border-green-700 text-white' : 'bg-slate-900 border-slate-800 text-white'
+      className={`fixed bottom-0 inset-x-0 z-40 flex items-center justify-between px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] transition-colors duration-300 animate-rise ${
+        done ? 'bg-accent-solid text-on-accent' : 'bg-ink text-page'
       }`}
     >
       <div className="flex items-center gap-3">
-        <span className="text-xs uppercase tracking-wide opacity-70">{done ? 'Go!' : 'Rest'}</span>
+        <span className="text-xs uppercase tracking-[0.1em] opacity-70">{done ? 'Go!' : 'Rest'}</span>
         <span className="text-2xl font-bold tabular-nums" data-testid="rest-timer">
           {done ? 'Next set' : `${mins}:${secs}`}
         </span>
@@ -90,11 +90,11 @@ export default function RestTimer({ endsAt, onDismiss, onAdjust }) {
       <div className="flex items-center gap-2">
         {!done && (
           <>
-            <button onClick={() => onAdjust(-30)} className="px-2 py-1 text-xs rounded bg-white/10 hover:bg-white/20">−30s</button>
-            <button onClick={() => onAdjust(30)} className="px-2 py-1 text-xs rounded bg-white/10 hover:bg-white/20">+30s</button>
+            <button onClick={() => onAdjust(-30)} className="min-h-9 rounded-lg bg-page/15 px-2.5 py-1 text-xs transition-colors hover:bg-page/25 active:scale-95">−30s</button>
+            <button onClick={() => onAdjust(30)} className="min-h-9 rounded-lg bg-page/15 px-2.5 py-1 text-xs transition-colors hover:bg-page/25 active:scale-95">+30s</button>
           </>
         )}
-        <button onClick={onDismiss} className="px-3 py-1 text-xs rounded bg-white/20 hover:bg-white/30 font-medium">
+        <button onClick={onDismiss} className="min-h-9 rounded-lg bg-page/25 px-3 py-1 text-xs font-medium transition-colors hover:bg-page/35 active:scale-95">
           {done ? 'Dismiss' : 'Skip'}
         </button>
       </div>

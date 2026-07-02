@@ -4,8 +4,8 @@ import { Outlet } from 'react-router-dom'
 // mid-set, maximum screen space for logging.
 export default function FocusLayout() {
   return (
-    <div className="min-h-screen bg-slate-50">
-      <main className="max-w-2xl mx-auto px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+    <div className="min-h-screen bg-page">
+      <main className="mx-auto max-w-2xl px-5 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
         <Outlet />
       </main>
     </div>

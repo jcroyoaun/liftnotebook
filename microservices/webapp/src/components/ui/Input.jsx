@@ -1,7 +1,7 @@
 export default function Input({ label, className = '', ...props }) {
   const input = (
     <input
-      className={`w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
+      className={`w-full min-h-11 rounded-field border border-line-2 bg-raised px-3 text-[15px] text-ink placeholder:text-ink-4 transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 ${className}`}
       {...props}
     />
   )
@@ -10,7 +10,7 @@ export default function Input({ label, className = '', ...props }) {
 
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+      <label className="mb-1.5 block text-sm font-medium text-ink-2">{label}</label>
       {input}
     </div>
   )

@@ -18,7 +18,7 @@ export default function PlateCalculator({ open, onClose, initialWeight = 60 }) {
         </div>
 
         {!exact && (
-          <div className="text-xs text-amber-600 bg-amber-50 rounded-lg p-2">
+          <div className="rounded-lg bg-warn-wash p-2.5 text-xs text-warn">
             {weight <= bar
               ? 'Target is at or below the bar weight.'
               : `Not loadable exactly — closest is ${loadable} kg.`}
@@ -26,15 +26,15 @@ export default function PlateCalculator({ open, onClose, initialWeight = 60 }) {
         )}
 
         <div>
-          <div className="text-xs text-slate-500 mb-2">Per side</div>
+          <div className="mb-2 text-xs text-ink-3">Per side</div>
           {perSide.length === 0 ? (
-            <div className="text-sm text-slate-400">Empty bar</div>
+            <div className="text-sm text-ink-3">Empty bar</div>
           ) : (
-            <div className="flex items-end gap-1 flex-wrap">
+            <div className="flex flex-wrap items-end gap-1">
               {perSide.map((p, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-center rounded bg-blue-600 text-white text-xs font-semibold"
+                  className="flex items-center justify-center rounded bg-ink text-xs font-semibold text-page tabular-nums animate-pop"
                   style={{ height: `${36 + Math.min(p, 25) * 1.6}px`, minWidth: '2.4rem' }}
                 >
                   {p}

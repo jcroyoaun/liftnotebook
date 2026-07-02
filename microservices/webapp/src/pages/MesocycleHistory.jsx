@@ -52,45 +52,45 @@ export default function MesocycleHistory() {
         subtitle="Your training blocks"
         action={
           <Link to="/programs/new"
-            className="text-sm bg-blue-600 text-white px-3.5 py-2 rounded-lg font-medium active:bg-blue-700">
+            className="inline-flex min-h-11 items-center rounded-btn bg-accent-solid px-3.5 text-sm font-semibold text-on-accent transition-all active:scale-[0.97] active:bg-accent-press">
             New block
           </Link>
         }
       />
 
       {mesocycles.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-slate-500 mb-1 font-medium">No training blocks yet</p>
-          <p className="text-sm text-slate-400">Create one to start logging workouts.</p>
+        <div className="py-16 text-center">
+          <p className="mb-1 font-medium text-ink-2">No training blocks yet</p>
+          <p className="text-sm text-ink-3">Create one to start logging workouts.</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {mesocycles.map(m => (
-            <div key={m.id} className="bg-white rounded-xl border border-slate-200 px-4 py-3">
+            <div key={m.id} className="rounded-card border border-line bg-card px-4 py-3 shadow-card transition-colors active:bg-sunken">
               <div className="flex items-center justify-between gap-3">
-                <Link to={`/programs/${m.id}/volume`} className="flex-1 min-w-0">
+                <Link to={`/programs/${m.id}/volume`} className="min-w-0 flex-1 py-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-slate-900 truncate">{m.name}</h3>
+                    <h3 className="truncate font-semibold text-ink">{m.name}</h3>
                     {!m.ended_at && (
-                      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-green-100 text-green-700">
+                      <span className="shrink-0 rounded bg-ok-wash px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ok">
                         Active
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="mt-0.5 text-xs text-ink-3">
                     {m.days_per_week} days/week · {formatRange(m)}
                   </p>
                 </Link>
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex shrink-0 items-center gap-1">
                   <button
                     onClick={() => setConfirmTarget(m)}
                     aria-label={`delete ${m.name}`}
-                    className="p-2 text-slate-300 active:text-red-500">
+                    className="grid h-11 w-11 place-items-center rounded-full text-ink-4 transition-colors hover:bg-danger-wash hover:text-danger active:text-danger">
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                   </button>
-                  <svg className="h-4 w-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-4 w-4 text-ink-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>

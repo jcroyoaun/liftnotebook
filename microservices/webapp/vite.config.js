@@ -11,14 +11,18 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.js',
+      // woff2 must be in the precache or the display font dies offline
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+      },
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'LiftNotebook',
         short_name: 'LiftNotebook',
         description: 'Track your gains, not your wallet',
-        theme_color: '#1d4ed8',
-        background_color: '#f8fafc',
+        theme_color: '#f6f4ef',
+        background_color: '#f6f4ef',
         display: 'standalone',
         start_url: '/',
         icons: [

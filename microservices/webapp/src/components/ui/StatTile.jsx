@@ -1,9 +1,14 @@
+import useAnimatedNumber from '../../lib/useAnimatedNumber'
+
 export default function StatTile({ label, value, sub, className = '' }) {
+  const display = useAnimatedNumber(value)
   return (
-    <div className={`bg-white rounded-xl border border-slate-200 p-3 text-center ${className}`}>
-      <div className="text-xl font-bold text-slate-900">{value}</div>
-      <div className="text-xs text-slate-500">{label}</div>
-      {sub && <div className="text-[11px] text-slate-400 mt-0.5">{sub}</div>}
+    <div className={`bg-card rounded-card border border-line shadow-card p-3 ${className}`}>
+      <div className="font-display text-[24px] font-semibold leading-none text-ink tabular-nums">
+        {display}
+      </div>
+      <div className="mt-1.5 text-xs text-ink-3">{label}</div>
+      {sub && <div className="mt-0.5 text-[11px] text-ink-3">{sub}</div>}
     </div>
   )
 }

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { setSession } from '../auth/session'
+import Input from '../components/ui/Input'
+import Button from '../components/ui/Button'
 
 export default function Register() {
   const [name, setName] = useState('')
@@ -28,40 +30,30 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-center mb-1">LiftNotebook</h1>
-        <p className="text-sm text-slate-500 text-center mb-6">Track your gains, not your wallet</p>
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
-          <h2 className="text-lg font-semibold">Create Account</h2>
-          {error && <div className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} required
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={8}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Invite Code</label>
-            <input type="text" value={inviteCode} onChange={e => setInviteCode(e.target.value)}
-              placeholder="Ask the person who invited you"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <button type="submit" disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+    <div className="flex min-h-screen items-center justify-center bg-page px-5">
+      <div className="w-full max-w-sm animate-rise">
+        <h1 className="font-display mb-1 text-center text-[34px] font-bold text-ink">
+          Lift<span className="italic text-accent">Notebook</span>
+        </h1>
+        <p className="mb-8 text-center text-sm text-ink-3">Track your gains, not your wallet</p>
+        <form onSubmit={handleSubmit} className="space-y-4 rounded-card border border-line bg-card p-6 shadow-card">
+          <h2 className="font-display text-lg font-semibold text-ink">Create Account</h2>
+          {error && <div className="rounded-lg bg-danger-wash p-2.5 text-sm text-danger">{error}</div>}
+          <Input label="Name" type="text" value={name} onChange={e => setName(e.target.value)} required />
+          <Input label="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+          <Input label="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} />
+          <Input
+            label="Invite Code"
+            type="text"
+            value={inviteCode}
+            onChange={e => setInviteCode(e.target.value)}
+            placeholder="Ask the person who invited you"
+          />
+          <Button type="submit" disabled={loading} className="w-full min-h-12">
             {loading ? 'Creating...' : 'Create Account'}
-          </button>
-          <p className="text-sm text-center text-slate-500">
-            Already have an account? <Link to="/login" className="text-blue-600 hover:underline">Sign In</Link>
+          </Button>
+          <p className="text-center text-sm text-ink-3">
+            Already have an account? <Link to="/login" className="font-medium text-accent hover:underline">Sign In</Link>
           </p>
         </form>
       </div>

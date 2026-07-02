@@ -20,10 +20,10 @@ export function ToastProvider({ children }) {
           <div
             key={t.id}
             role="status"
-            className={`pointer-events-auto max-w-sm w-full text-center text-sm font-medium rounded-xl px-4 py-3 shadow-lg ${
+            className={`pointer-events-auto w-full max-w-sm rounded-card px-4 py-3 text-center text-sm font-medium shadow-raised animate-rise ${
               t.variant === 'success'
-                ? 'bg-slate-900 text-white'
-                : 'bg-red-600 text-white'
+                ? 'bg-ink text-page'
+                : 'bg-danger-solid text-on-accent'
             }`}
           >
             {t.message}

@@ -73,7 +73,7 @@ export default function WorkoutSession() {
   }
 
   if (session.isError) {
-    return <div className="text-center py-12 text-red-500">Could not load session.</div>
+    return <div className="py-12 text-center text-danger">Could not load session.</div>
   }
   // Covers both the initial fetch and the pre-restore window of the
   // persisted cache, where the query is pending but not yet fetching.
@@ -118,14 +118,14 @@ export default function WorkoutSession() {
     <div className="space-y-4 pb-20">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-slate-800">{meta?.day_label}</h2>
-          <p className="text-xs text-slate-500">
+          <h2 className="font-display text-[24px] font-semibold leading-tight text-ink">{meta?.day_label}</h2>
+          <p className="text-xs text-ink-3">
             {meta?.performed_at && new Date(meta.performed_at).toLocaleDateString()}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {(!online || pendingSets.length > 0) && (
-            <span className="text-[11px] px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-medium" data-testid="sync-status">
+            <span className="rounded-full bg-warn-wash px-2 py-1 text-[11px] font-medium text-warn" data-testid="sync-status">
               {online
                 ? 'Syncing…'
                 : pendingSets.length > 0
@@ -135,7 +135,7 @@ export default function WorkoutSession() {
           )}
           <button
             onClick={finish}
-            className="text-sm bg-green-600 text-white px-4 py-1.5 rounded-lg active:bg-green-700"
+            className="inline-flex min-h-11 items-center rounded-btn bg-accent-solid px-4 text-sm font-semibold text-on-accent transition-all active:scale-[0.97] active:bg-accent-press"
           >
             Finish
           </button>
