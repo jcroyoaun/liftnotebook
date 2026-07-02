@@ -266,7 +266,7 @@ export default function Dashboard() {
                   >
                     <span className="text-[15px] font-medium text-ink">{ex.exercise_name}</span>
                     <span className="text-[13px] text-ink-3 tabular-nums">
-                      {ex.target_sets} × {ex.target_rep_range_low}–{ex.target_rep_range_high}
+                      {ex.target_sets} sets
                     </span>
                   </ExerciseDetailButton>
                 ))}

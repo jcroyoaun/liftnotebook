@@ -11,9 +11,7 @@ export default function ExerciseLogCard({ exercise, suggestion, sets, onAddSet, 
   const recordedCount = sets.filter((s) => s.recorded).length
   const complete = recordedCount >= exercise.target_sets
   const last = suggestion?.last_performance
-  const targetLabel = suggestion
-    ? `${suggestion.target_sets}×${suggestion.target_rep_range_low}–${suggestion.target_rep_range_high} @ RIR ${suggestion.target_rir}`
-    : `${exercise.target_sets} sets`
+  const targetLabel = `${suggestion?.target_sets ?? exercise.target_sets} sets · to failure`
 
   return (
     <div className="overflow-hidden rounded-card border border-line bg-card shadow-card">
@@ -46,14 +44,11 @@ export default function ExerciseLogCard({ exercise, suggestion, sets, onAddSet, 
 
         {suggestion && (
           <div className="mt-1.5 text-xs">
-            {suggestion.suggested_weight > 0 ? (
-              <span className="font-medium text-accent">
-                Target: {suggestion.suggested_weight} kg × {suggestion.suggested_reps}
-              </span>
-            ) : (
-              <span className="font-medium text-accent">Target: {suggestion.suggested_reps}+ reps to failure</span>
+            {/* No rep prescriptions — failure decides the reps. Weight is the only cue. */}
+            {suggestion.suggested_weight > 0 && (
+              <span className="font-medium text-accent">{suggestion.suggested_weight} kg</span>
             )}
-            <span className="text-ink-3"> — {suggestion.reason}</span>
+            <span className="text-ink-3">{suggestion.suggested_weight > 0 ? ' — ' : ''}{suggestion.reason}</span>
             {last && <div className="mt-0.5 text-ink-3">Last time: {formatLast(last)}</div>}
           </div>
         )}

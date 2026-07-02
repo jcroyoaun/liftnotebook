@@ -20,7 +20,7 @@ export default defineConfig({
       manifest: {
         name: 'LiftNotebook',
         short_name: 'LiftNotebook',
-        description: 'Track your gains, not your wallet',
+        description: 'Your training, written down',
         theme_color: '#f6f4ef',
         background_color: '#f6f4ef',
         display: 'standalone',

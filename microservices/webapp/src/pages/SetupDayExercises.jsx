@@ -221,7 +221,7 @@ export default function SetupDayExercises() {
             </div>
             <div className="mt-1.5 flex items-center justify-between pl-7">
               <span className="rounded-full bg-sunken px-2 py-0.5 text-[11px] text-ink-2">
-                {ex.target_rep_range_low ?? 8}–{ex.target_rep_range_high ?? 12} reps @ RIR {ex.target_rir ?? 0}
+                to failure
               </span>
               <div className="flex items-center gap-1">
                 <button onClick={() => updateSets(i, ex.target_sets - 1)} aria-label="fewer sets"

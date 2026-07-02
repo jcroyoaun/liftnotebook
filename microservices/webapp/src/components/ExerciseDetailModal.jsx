@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import BottomSheet from './ui/BottomSheet'
+import MuscleMap from './MuscleMap'
 import { Skeleton } from './ui/Skeleton'
 
 function sectionTargets(targets, targetType) {
@@ -82,6 +83,7 @@ export default function ExerciseDetailModal({ exerciseId, onClose }) {
 
         {!loading && !error && (
           <>
+            <MuscleMap targets={exercise?.targets} />
             <TargetSection title="Primary Muscles" targets={primaryTargets} emptyLabel="No primary muscles configured." />
             <TargetSection title="Secondary Muscles" targets={secondaryTargets} emptyLabel="No secondary muscles configured." />
 

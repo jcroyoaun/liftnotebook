@@ -72,7 +72,7 @@ test.describe.serial('Offline set logging', () => {
 
     // Log a set entirely offline.
     await page.click('button:has-text("Add Set")')
-    await page.locator('button[aria-label="increase kg"]').click() // 0 -> 2.5
+    await page.locator('button[aria-label="increase weight"]').click() // 0 -> 2.5
     await page.click('button:has-text("Done")')
 
     // Optimistic UI: the set shows as logged immediately, and once the
@@ -112,8 +112,8 @@ test.describe.serial('Offline set logging', () => {
     await context.setOffline(true)
 
     // Bump the weight twice offline: 2.5 -> 7.5.
-    await page.locator('button[aria-label="increase kg"]').click()
-    await page.locator('button[aria-label="increase kg"]').click()
+    await page.locator('button[aria-label="increase weight"]').click()
+    await page.locator('button[aria-label="increase weight"]').click()
     await expect(page.getByTestId('sync-status')).toContainText('pending', { timeout: 5000 })
 
     await context.setOffline(false)

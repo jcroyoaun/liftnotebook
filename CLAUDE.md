@@ -49,6 +49,10 @@ are just different per-exercise target values.
   `animate-stamp/rise/pop/fade-in` keyframes from `index.css`, count-up stat
   tiles via `useAnimatedNumber` (respects prefers-reduced-motion).
 - User-facing copy says "training block", not "mesocycle" (code keeps mesocycle).
+- Weights are stored/displayed in kg ONLY (canonical); lb exists solely as an
+  input-side toggle in the logger (`src/lib/units.js` converts at commit).
+- House philosophy in UI copy: sets + "to failure" — never surface rep-range
+  prescriptions (the target_rep_range columns are inert defaults).
 - Mobile-first: bottom tab bar (Today / Programs / Progress), FocusLayout for
   active workouts, safe-area padding.
 - E2E locators are copy-based — keep visible copy stable or update

@@ -33,7 +33,7 @@ export default function Login() {
         <h1 className="font-display mb-1 text-center text-[34px] font-bold text-ink">
           Lift<span className="italic text-accent">Notebook</span>
         </h1>
-        <p className="mb-8 text-center text-sm text-ink-3">Track your gains, not your wallet</p>
+        <p className="mb-8 text-center text-sm text-ink-3">Your training, written down</p>
         <form onSubmit={handleSubmit} className="space-y-4 rounded-card border border-line bg-card p-6 shadow-card">
           <h2 className="font-display text-lg font-semibold text-ink">Sign In</h2>
           {error && <div className="rounded-lg bg-danger-wash p-2.5 text-sm text-danger">{error}</div>}

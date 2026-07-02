@@ -58,7 +58,7 @@ export default function Settings() {
         </div>
         <div className="flex min-h-12 items-center justify-between px-4 py-3">
           <span className="text-sm text-ink">Units</span>
-          <span className="text-sm text-ink-3">kg</span>
+          <span className="text-sm text-ink-3">kg · switch to lb per set while logging</span>
         </div>
         <div className="flex min-h-12 items-center justify-between px-4 py-3">
           <span className="text-sm text-ink">App</span>

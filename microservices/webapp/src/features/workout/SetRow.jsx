@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import NumberStepper from '../../components/ui/NumberStepper'
+import { kgToDisplay, displayToKg, getUnitPref, setUnitPref } from '../../lib/units'
 
 const RIR_CHIPS = [0, 1, 2, 3, 4]
 
@@ -6,7 +8,18 @@ const RIR_CHIPS = [0, 1, 2, 3, 4]
 // tappable chips. Every interaction commits immediately (optimistic +
 // debounced sync) — nothing waits for blur. Logging a set is the app's
 // signature moment: the row "stamps" green with a spring-in check.
+//
+// Weight input can flip kg↔lb per set (mixed-equipment gyms) — tapping the
+// unit label toggles it. Storage stays canonical kg; lb is input-only.
 export default function SetRow({ set, onChange, onRecord, onDelete, canDelete }) {
+  const [unit, setUnit] = useState(() => getUnitPref(set.exercise_id))
+
+  function toggleUnit() {
+    const next = unit === 'kg' ? 'lb' : 'kg'
+    setUnit(next)
+    setUnitPref(set.exercise_id, next)
+  }
+
   return (
     <div
       className={`border-b border-line px-3 py-2.5 transition-colors duration-300 ${
@@ -18,11 +31,24 @@ export default function SetRow({ set, onChange, onRecord, onDelete, canDelete })
 
         <NumberStepper
           className="flex-1"
-          label="kg"
-          value={set.weight}
-          step={2.5}
+          ariaLabel="weight"
+          label={
+            <button
+              type="button"
+              onClick={toggleUnit}
+              aria-label={`weight unit: ${unit}. Tap to switch`}
+              className="inline-flex items-center gap-0.5 rounded-full bg-sunken px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-2 transition-all active:scale-95 active:bg-line"
+            >
+              {unit}
+              <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4" />
+              </svg>
+            </button>
+          }
+          value={kgToDisplay(set.weight, unit)}
+          step={unit === 'lb' ? 5 : 2.5}
           min={0}
-          onChange={(v) => onChange({ ...set, weight: v })}
+          onChange={(v) => onChange({ ...set, weight: displayToKg(v, unit) })}
         />
         <NumberStepper
           className="flex-1"

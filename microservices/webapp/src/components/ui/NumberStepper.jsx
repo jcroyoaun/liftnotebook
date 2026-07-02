@@ -1,8 +1,9 @@
 // Mobile-first numeric input: +/- taps are the primary interaction (no
 // keyboard needed mid-set), typing is secondary. Commits on every
 // interaction rather than on blur so optimistic updates fire immediately.
-export default function NumberStepper({ value, onChange, step = 1, min = 0, max = 9999, label, className = '' }) {
+export default function NumberStepper({ value, onChange, step = 1, min = 0, max = 9999, label, ariaLabel, className = '' }) {
   const current = Number(value) || 0
+  const name = ariaLabel || (typeof label === 'string' ? label : 'value')
 
   function clamp(n) {
     return Math.min(max, Math.max(min, n))
@@ -24,7 +25,7 @@ export default function NumberStepper({ value, onChange, step = 1, min = 0, max 
       <div className="flex items-center gap-1">
         <button
           type="button"
-          aria-label={`decrease ${label || 'value'}`}
+          aria-label={`decrease ${name}`}
           onClick={() => onChange(clamp(current - step))}
           className="h-11 w-11 shrink-0 rounded-field border border-line-2 bg-card text-xl font-medium text-ink-2 transition-all duration-100 active:scale-95 active:bg-sunken"
         >
@@ -39,7 +40,7 @@ export default function NumberStepper({ value, onChange, step = 1, min = 0, max 
         />
         <button
           type="button"
-          aria-label={`increase ${label || 'value'}`}
+          aria-label={`increase ${name}`}
           onClick={() => onChange(clamp(current + step))}
           className="h-11 w-11 shrink-0 rounded-field border border-line-2 bg-card text-xl font-medium text-ink-2 transition-all duration-100 active:scale-95 active:bg-sunken"
         >
