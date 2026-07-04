@@ -97,9 +97,8 @@ are just different per-exercise target values.
   `liftnotebook-db-credentials` secret (mirrored cross-namespace by the
   deploy script). Catalog/schema changes ship as workouttracker migrations —
   there is no second database to sync anymore. The old `exerciselib-db`
-  Postgres cluster is still running as a rollback fallback; decommission once
-  comfortable: `kubectl --kubeconfig kubeconfig delete postgresql
-  exerciselib-db -n exerciselib` (frees ~1Gi PVC + a pod on the tiny cluster).
+  Postgres cluster was decommissioned 2026-07-04 (CR + pod + 1Gi PVC deleted;
+  catalogs verified byte-identical first).
 - Password reset is admin-assisted (no email infra by design): admins mint
   one-time codes in Settings → Members (`POST /v1/admin/users/:id/reset-token`,
   2h expiry, sha256-hashed in the `tokens` table); users redeem at
@@ -118,9 +117,10 @@ are just different per-exercise target values.
   change-password, program templates (admin-authored, one-tap "Start this
   block" via `POST /v1/templates/:id/start`), Coach's corner admin UI
   (template builder + members/reset codes), catalog DB unification
-  (exerciselib → liftnotebook-db, live cutover verified; old cluster pending
-  decommission), character pass (AuthShell aurora + barbell mark, dashboard
-  greeting, workout-finish summary sheet, house-voice microcopy).
+  (exerciselib → liftnotebook-db, live cutover verified, old cluster
+  decommissioned), character pass (AuthShell aurora + barbell mark, dashboard
+  greeting, workout-finish summary sheet, house-voice microcopy). Deployed
+  2026-07-04, images sha-b051054e84fc.
 
 ### Next up — owner picks from this menu
 
@@ -128,7 +128,8 @@ are just different per-exercise target values.
 2. Rest-timer push notification when rest ends, screen off (PWA web push).
 3. Edit-past-workout escape hatch + session notes editing (needs
    PATCH /v1/sessions/:id).
-4. Decommission old exerciselib-db cluster (one kubectl delete, see above).
+- Owner still owes the house template programs (exercise lists per day) to
+  seed the template catalog via Coach's corner.
 - Optional add-on: chart kit — src/components/charts/ (shared ChartTooltip +
   TrendChart/HBarChart wrappers baking in theme/grid/axis defaults). The
   chartTheme.js token layer is solid; the gap is hand-rolled Recharts markup
