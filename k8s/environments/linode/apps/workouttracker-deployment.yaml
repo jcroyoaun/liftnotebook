@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: workouttracker
-          image: ghcr.io/jcroyoaun/workouttracker:sha-c1e2f3bb5540
+          image: ghcr.io/jcroyoaun/workouttracker:sha-60f1917f5204
           imagePullPolicy: Always
           args:
             - -env=production
