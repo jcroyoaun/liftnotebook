@@ -238,6 +238,24 @@ test.describe.serial('Full User Journey', () => {
     await expect(day2).toHaveAttribute('aria-expanded', 'true')
   })
 
+  // 5c. ABANDONED WORKOUT — Start Workout creates the session immediately;
+  // backing out without logging must not mark the day done or advance Up next.
+  test('5c. Abandoned empty workout does not mark the day done', async ({ page }) => {
+    await loginAndGo(page, '/')
+
+    const pushDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 1: Push' })
+    await pushDay.locator('button:has-text("Start Workout")').first().click()
+    await page.waitForURL(/\/workout\/\d+/)
+
+    // Bail without logging anything — the classic pocket-dial start.
+    await page.goBack()
+    await expect(page).toHaveURL('/')
+
+    await expect(page.locator('text=✓ Done')).toHaveCount(0)
+    // Day 1 is still the suggested (auto-expanded) day.
+    await expect(page.locator('button[aria-label="toggle Day 1: Push"]')).toHaveAttribute('aria-expanded', 'true')
+  })
+
   // 6. WEEK 1 - full training week
   test('6a. Week 1 Push workout', async ({ page }) => {
     await loginAndGo(page, '/')

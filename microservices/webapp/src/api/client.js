@@ -83,6 +83,7 @@ export const api = {
   createSession: (body) => request('/sessions', { method: 'POST', body: JSON.stringify(body) }),
   getSession: (id) => request(`/sessions/${id}`),
   updateSession: (id, body) => request(`/sessions/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteSession: (id) => request(`/sessions/${id}`, { method: 'DELETE' }),
   getMesocycleSessions: (mesoId) => request(`/mesocycles/${mesoId}/sessions`),
 
   // Web push (rest-timer notifications)

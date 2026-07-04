@@ -36,6 +36,61 @@ func TestWorkoutSessionUpdatePersistsNotesAndDate(t *testing.T) {
 	stub.assertExhausted(t)
 }
 
+func TestListForMesocycleExposesRecordedSetCounts(t *testing.T) {
+	now := time.Now()
+
+	db, stub := newStubDB(t,
+		stubExpectation{
+			op:          "query",
+			sqlContains: "SELECT count(*) FROM workout_sets s WHERE s.workout_session_id = ws.id AND s.recorded",
+			args:        []driver.Value{int64(7), int64(3)},
+			rows: &stubRows{
+				columns: []string{"id", "user_id", "mesocycle_id", "training_day_id", "label", "performed_at", "notes", "recorded_sets", "created_at", "version"},
+				values: [][]driver.Value{
+					{int64(20), int64(7), int64(3), int64(1), "Push", now, nil, int64(6), now, int64(1)},
+					{int64(21), int64(7), int64(3), int64(2), "Pull", now, nil, int64(0), now, int64(1)},
+				},
+			},
+		},
+	)
+
+	model := WorkoutSessionModel{DB: db}
+
+	sessions, err := model.ListForMesocycle(7, 3)
+	if err != nil {
+		t.Fatalf("ListForMesocycle: %v", err)
+	}
+	if len(sessions) != 2 {
+		t.Fatalf("len = %d, want 2", len(sessions))
+	}
+	if sessions[0].RecordedSets != 6 || sessions[1].RecordedSets != 0 {
+		t.Errorf("recorded sets = %d/%d, want 6/0 (abandoned session must be distinguishable)",
+			sessions[0].RecordedSets, sessions[1].RecordedSets)
+	}
+
+	stub.assertExhausted(t)
+}
+
+func TestWorkoutSessionDeleteReturnsNotFoundForForeignSession(t *testing.T) {
+	db, stub := newStubDB(t,
+		stubExpectation{
+			op:          "exec",
+			sqlContains: "DELETE FROM workout_sessions WHERE id = $1 AND user_id = $2",
+			args:        []driver.Value{int64(9), int64(7)},
+			result:      driver.RowsAffected(0),
+		},
+	)
+
+	model := WorkoutSessionModel{DB: db}
+
+	err := model.Delete(9, 7)
+	if !errors.Is(err, ErrRecordNotFound) {
+		t.Fatalf("err = %v, want ErrRecordNotFound", err)
+	}
+
+	stub.assertExhausted(t)
+}
+
 func TestWorkoutSessionUpdateReturnsEditConflict(t *testing.T) {
 	db, stub := newStubDB(t,
 		stubExpectation{

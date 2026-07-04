@@ -177,6 +177,33 @@ func (app *application) updateWorkoutSessionHandler(w http.ResponseWriter, r *ht
 	}
 }
 
+// deleteWorkoutSessionHandler cleans up sessions — the logger uses it to
+// discard abandoned empty workouts (Start Workout creates the row up front).
+func (app *application) deleteWorkoutSessionHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	userID := app.contextGetUserID(r)
+
+	err = app.models.WorkoutSessions.Delete(id, userID)
+	if err != nil {
+		if errors.Is(err, data.ErrRecordNotFound) {
+			app.notFoundResponse(w, r)
+			return
+		}
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"message": "session deleted"}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
 func (app *application) listWorkoutSessionsHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readIDParam(r)
 	if err != nil {

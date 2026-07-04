@@ -45,6 +45,7 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodPost, "/v1/sessions", app.requireAuth(app.createWorkoutSessionHandler))
 	router.HandlerFunc(http.MethodGet, "/v1/sessions/:id", app.requireAuth(app.getWorkoutSessionHandler))
 	router.HandlerFunc(http.MethodPatch, "/v1/sessions/:id", app.requireAuth(app.updateWorkoutSessionHandler))
+	router.HandlerFunc(http.MethodDelete, "/v1/sessions/:id", app.requireAuth(app.deleteWorkoutSessionHandler))
 	router.HandlerFunc(http.MethodGet, "/v1/mesocycles/:id/sessions", app.requireAuth(app.listWorkoutSessionsHandler))
 
 	// Web push (rest-timer notifications)

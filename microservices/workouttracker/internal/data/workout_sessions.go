@@ -15,6 +15,9 @@ type WorkoutSession struct {
 	DayLabel      string    `json:"day_label,omitempty"`
 	PerformedAt   time.Time `json:"performed_at"`
 	Notes         *string   `json:"notes"`
+	// RecordedSets distinguishes real workouts from abandoned empty sessions
+	// (Start Workout creates the row before any set is logged).
+	RecordedSets  int       `json:"recorded_sets"`
 	CreatedAt     time.Time `json:"-"`
 	Version       int32     `json:"version,omitzero"`
 }
@@ -45,7 +48,9 @@ func (m WorkoutSessionModel) Insert(session *WorkoutSession) error {
 func (m WorkoutSessionModel) Get(id, userID int64) (*WorkoutSession, error) {
 	query := `
 		SELECT ws.id, ws.user_id, ws.mesocycle_id, ws.training_day_id, td.label,
-		       ws.performed_at, ws.notes, ws.created_at, ws.version
+		       ws.performed_at, ws.notes,
+		       (SELECT count(*) FROM workout_sets s WHERE s.workout_session_id = ws.id AND s.recorded),
+		       ws.created_at, ws.version
 		FROM workout_sessions ws
 		JOIN training_days td ON ws.training_day_id = td.id
 		WHERE ws.id = $1 AND ws.user_id = $2`
@@ -57,7 +62,8 @@ func (m WorkoutSessionModel) Get(id, userID int64) (*WorkoutSession, error) {
 
 	err := m.DB.QueryRowContext(ctx, query, id, userID).Scan(
 		&session.ID, &session.UserID, &session.MesocycleID, &session.TrainingDayID,
-		&session.DayLabel, &session.PerformedAt, &session.Notes, &session.CreatedAt, &session.Version,
+		&session.DayLabel, &session.PerformedAt, &session.Notes, &session.RecordedSets,
+		&session.CreatedAt, &session.Version,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -66,6 +72,29 @@ func (m WorkoutSessionModel) Get(id, userID int64) (*WorkoutSession, error) {
 		return nil, err
 	}
 	return &session, nil
+}
+
+// Delete removes an abandoned session (sets cascade). Ownership enforced by
+// user_id in the WHERE clause.
+func (m WorkoutSessionModel) Delete(id, userID int64) error {
+	query := `DELETE FROM workout_sessions WHERE id = $1 AND user_id = $2`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	result, err := m.DB.ExecContext(ctx, query, id, userID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return ErrRecordNotFound
+	}
+	return nil
 }
 
 // Update persists edits to a past workout's date and notes; sets have their
@@ -95,7 +124,9 @@ func (m WorkoutSessionModel) Update(session *WorkoutSession) error {
 func (m WorkoutSessionModel) ListForMesocycle(userID, mesocycleID int64) ([]*WorkoutSession, error) {
 	query := `
 		SELECT ws.id, ws.user_id, ws.mesocycle_id, ws.training_day_id, td.label,
-		       ws.performed_at, ws.notes, ws.created_at, ws.version
+		       ws.performed_at, ws.notes,
+		       (SELECT count(*) FROM workout_sets s WHERE s.workout_session_id = ws.id AND s.recorded),
+		       ws.created_at, ws.version
 		FROM workout_sessions ws
 		JOIN training_days td ON ws.training_day_id = td.id
 		WHERE ws.user_id = $1 AND ws.mesocycle_id = $2
@@ -115,7 +146,8 @@ func (m WorkoutSessionModel) ListForMesocycle(userID, mesocycleID int64) ([]*Wor
 		var s WorkoutSession
 		err := rows.Scan(
 			&s.ID, &s.UserID, &s.MesocycleID, &s.TrainingDayID,
-			&s.DayLabel, &s.PerformedAt, &s.Notes, &s.CreatedAt, &s.Version,
+			&s.DayLabel, &s.PerformedAt, &s.Notes, &s.RecordedSets,
+			&s.CreatedAt, &s.Version,
 		)
 		if err != nil {
 			return nil, err

@@ -153,12 +153,17 @@ export default function Dashboard() {
     ...Object.keys(actMap),
   ])].sort()
 
+  // Only sessions with recorded work count anywhere below — Start Workout
+  // creates the session row up front, so an abandoned empty session must not
+  // mark a day done, advance "Up next", or pad the stats.
+  const trained = sessions.filter(s => (s.recorded_sets ?? 0) > 0)
+
   // Week stats
   const weekNumber = Math.max(1, Math.floor((Date.now() - new Date(meso.started_at).getTime()) / (7 * 86400_000)) + 1)
   const weekStart = new Date()
   weekStart.setHours(0, 0, 0, 0)
   weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)) // Monday
-  const sessionsThisWeek = sessions.filter(s => new Date(s.performed_at) >= weekStart).length
+  const sessionsThisWeek = trained.filter(s => new Date(s.performed_at) >= weekStart).length
   const setsThisWeek = Math.round(actualVolume.reduce((sum, bp) => sum + bp.total_sets, 0))
 
   // Consistency streak: consecutive Monday-weeks with at least one workout,
@@ -166,7 +171,7 @@ export default function Dashboard() {
   // streak until it's over — last week's streak carries through.
   const WEEK_MS = 7 * 86400_000
   const weeksWithSessions = new Set(
-    sessions.map(s => Math.floor((new Date(s.performed_at).getTime() - weekStart.getTime()) / WEEK_MS))
+    trained.map(s => Math.floor((new Date(s.performed_at).getTime() - weekStart.getTime()) / WEEK_MS))
   ) // 0 = this week, -1 = last week, ...
   let streakWeeks = 0
   for (let w = weeksWithSessions.has(0) ? 0 : -1; weeksWithSessions.has(w); w--) streakWeeks++
@@ -175,7 +180,7 @@ export default function Dashboard() {
   // (cyclic). Days always render in program order — this only places a badge
   // and expands one card; completing a day never reorders the list.
   const sortedDays = [...days].sort((a, b) => a.day_number - b.day_number)
-  const lastSession = sessions.reduce(
+  const lastSession = trained.reduce(
     (latest, s) => (!latest || new Date(s.performed_at) > new Date(latest.performed_at) ? s : latest),
     null
   )
@@ -186,7 +191,7 @@ export default function Dashboard() {
     ? sortedDays.find(d => d.day_number === (lastDayNumber % sortedDays.length) + 1) || sortedDays[0]
     : null
   const doneDayIds = new Set(
-    sessions.filter(s => new Date(s.performed_at) >= weekStart).map(s => s.training_day_id)
+    trained.filter(s => new Date(s.performed_at) >= weekStart).map(s => s.training_day_id)
   )
 
   const todayLine = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
@@ -402,11 +407,11 @@ export default function Dashboard() {
       )}
 
       {/* Recent workouts: read-only history, tap through for the set log */}
-      {sessions.length > 0 && (
+      {trained.length > 0 && (
         <div>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-2">Recent workouts</h3>
           <div className="divide-y divide-line overflow-hidden rounded-card border border-line bg-card shadow-card">
-            {[...sessions]
+            {[...trained]
               .sort((a, b) => new Date(b.performed_at) - new Date(a.performed_at))
               .slice(0, 8)
               .map(s => (

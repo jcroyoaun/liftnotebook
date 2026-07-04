@@ -111,8 +111,14 @@ export default function WorkoutSession() {
   // Finish = the celebration moment. Tally the recorded sets into a summary
   // sheet; the session actually closes when the sheet is dismissed.
   function finish() {
-    const recorded = (session.data?.sets || []).filter((s) => s.recorded)
+    const allSets = session.data?.sets || []
+    const recorded = allSets.filter((s) => s.recorded)
     if (recorded.length === 0) {
+      // Nothing logged at all: discard the husk so it never shows up as a
+      // phantom workout. Unrecorded drafts keep the session alive.
+      if (allSets.length === 0) {
+        api.deleteSession(sessionId).catch(() => {})
+      }
       closeOut()
       return
     }
