@@ -151,9 +151,8 @@ test.describe.serial('Full User Journey', () => {
   test('4a. Setup Push day exercises', async ({ page }) => {
     await loginAndGo(page, `/programs/${mesoId}/setup/${dayIds[0]}`)
 
-    // Add Flat Bench — picker rows carry line-art thumbnails
+    // Add Flat Bench
     await page.locator('input[placeholder*="Search"]').fill('Flat Barbell')
-    await expect(page.getByTestId('exercise-art').first()).toBeVisible()
     await page.click('button:has-text("Flat Barbell Bench Press")')
 
     // Add OHP
@@ -273,8 +272,7 @@ test.describe.serial('Full User Journey', () => {
 
     await page.getByRole('button', { name: 'Flat Barbell Bench Press', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Flat Barbell Bench Press' })).toBeVisible()
-    // Common movements show real demonstration photos in the detail sheet.
-    await expect(page.getByTestId('exercise-photo').first()).toBeVisible()
+    await expect(page.getByTestId('exercise-art').first()).toBeVisible()
     await expect(page.locator('text=Primary Muscles')).toBeVisible()
     await expect(page.locator('text=Pectoralis Major')).toBeVisible()
     await page.getByRole('button', { name: 'Close', exact: true }).click()
