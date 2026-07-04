@@ -215,6 +215,29 @@ test.describe.serial('Full User Journey', () => {
     await expect(page.locator('text=working sets done / planned')).toBeVisible()
   })
 
+  // 5b. DAY CARDS expand/collapse independently — "Up next" is a default,
+  // not a dictator: any combination of days can be open at once.
+  test('5b. Day cards expand and collapse independently', async ({ page }) => {
+    await loginAndGo(page, '/')
+
+    const day1 = page.locator('button[aria-label="toggle Day 1: Push"]')
+    const day2 = page.locator('button[aria-label="toggle Day 2: Pull"]')
+
+    // Fresh block: Day 1 is up next and open by default, Day 2 collapsed.
+    await expect(day1).toHaveAttribute('aria-expanded', 'true')
+    await expect(day2).toHaveAttribute('aria-expanded', 'false')
+
+    // Open Day 2 — BOTH are now expanded.
+    await day2.click()
+    await expect(day2).toHaveAttribute('aria-expanded', 'true')
+    await expect(day1).toHaveAttribute('aria-expanded', 'true')
+
+    // Collapse Day 1 — Day 2 stays open.
+    await day1.click()
+    await expect(day1).toHaveAttribute('aria-expanded', 'false')
+    await expect(day2).toHaveAttribute('aria-expanded', 'true')
+  })
+
   // 6. WEEK 1 - full training week
   test('6a. Week 1 Push workout', async ({ page }) => {
     await loginAndGo(page, '/')

@@ -20,6 +20,10 @@ export default function Dashboard() {
   const [actualVolume, setActualVolume] = useState([])
   const [sessions, setSessions] = useState([])
   const [confirmAction, setConfirmAction] = useState(null) // 'end' | 'delete' | null
+  // Per-day expand/collapse overrides. Unset days fall back to the smart
+  // default (the suggested next day opens), so the badge is a default, not
+  // a dictator — any combination of days can be open at once.
+  const [dayOverrides, setDayOverrides] = useState({})
   const navigate = useNavigate()
   const toast = useToast()
   const { chart } = useChartTheme()
@@ -241,7 +245,8 @@ export default function Dashboard() {
       </div>
 
       {/* The split, always in program order — completing a day never
-          reorders the list; the suggested day is badged and expanded in place */}
+          reorders the list. The suggested day is badged and opens by
+          default; every card expands/collapses independently. */}
       {sortedDays.length > 0 && (
         <div>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-2">This block</h3>
@@ -249,106 +254,110 @@ export default function Dashboard() {
             {sortedDays.map(day => {
               const isNext = day.id === nextDay?.id
               const isDone = doneDayIds.has(day.id)
+              const open = dayOverrides[day.id] ?? isNext
               const doneChip = isDone && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-ok-wash px-2 py-0.5 text-[11px] font-medium text-ok">
                   ✓ Done
                 </span>
               )
-              if (isNext) {
-                return (
-                  <div key={day.id} className="overflow-hidden rounded-card border border-line bg-card shadow-card">
-                    <div className="border-b border-line px-4 py-3.5">
-                      <div className="flex items-center justify-between">
-                        <span className="inline-flex items-center rounded-full bg-wash px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-accent">
-                          Up next
-                        </span>
-                        <div className="flex items-center gap-2">
-                          {doneChip}
-                          <Link
-                            to={`/programs/${meso.id}/setup/${day.id}`}
-                            className="py-1 text-[13px] font-medium text-accent"
+              return (
+                <div key={day.id} className="overflow-hidden rounded-card border border-line bg-card shadow-card">
+                  <div className={`px-4 py-3 ${open ? 'border-b border-line' : ''}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        onClick={() => setDayOverrides(prev => ({ ...prev, [day.id]: !open }))}
+                        aria-expanded={open}
+                        aria-label={`toggle Day ${day.day_number}: ${day.label}`}
+                        className="flex min-h-9 min-w-0 flex-1 items-center gap-2 text-left"
+                      >
+                        <svg
+                          className={`h-4 w-4 shrink-0 text-ink-4 transition-transform ${open ? 'rotate-90' : ''}`}
+                          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <h3 className={`truncate font-semibold text-ink ${open ? 'font-display text-[17px]' : 'text-[15px]'}`}>
+                          Day {day.day_number}: {day.label}
+                        </h3>
+                        {doneChip}
+                      </button>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {isNext && (
+                          <span className="inline-flex items-center rounded-full bg-wash px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-accent">
+                            Up next
+                          </span>
+                        )}
+                        <Link
+                          to={`/programs/${meso.id}/setup/${day.id}`}
+                          className="min-h-8 rounded-btn px-2 py-1 text-xs font-medium text-ink-3 transition-colors hover:bg-sunken hover:text-ink-2"
+                        >
+                          Edit
+                        </Link>
+                        {!open && (
+                          <button
+                            onClick={() => startWorkout(day)}
+                            disabled={starting === day.id}
+                            className="min-h-8 rounded-btn border border-line-2 bg-card px-3 py-1 text-xs font-semibold text-ink transition-all hover:bg-sunken active:scale-[0.97] disabled:opacity-50"
                           >
-                            Edit
-                          </Link>
-                        </div>
+                            {starting === day.id ? 'Starting...' : 'Start Workout'}
+                          </button>
+                        )}
                       </div>
-                      <h3 className="mt-1.5 font-display text-[19px] font-semibold text-ink">
-                        Day {day.day_number}: {day.label}
-                      </h3>
-                      <p className="mt-0.5 text-[13px] text-ink-3">
+                    </div>
+                    {!open && (
+                      day.exercises && day.exercises.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {day.exercises.map(ex => (
+                            <ExerciseDetailButton
+                              key={ex.id}
+                              exerciseId={ex.exercise_id}
+                              className="inline-flex items-center rounded-md bg-sunken px-2 py-1 text-xs text-ink-2 transition-colors hover:bg-wash hover:text-accent"
+                            >
+                              {ex.exercise_name}
+                              <span className="ml-1 text-ink-4">{ex.target_sets}s</span>
+                            </ExerciseDetailButton>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-xs text-ink-3">No exercises assigned yet</p>
+                      )
+                    )}
+                    {open && (
+                      <p className="mt-1 pl-6 text-[13px] text-ink-3">
                         {(day.exercises || []).length} exercises · 2 working sets each, to failure
                       </p>
-                    </div>
-                    {day.exercises && day.exercises.length > 0 ? (
-                      <div>
-                        {day.exercises.map(ex => (
-                          <ExerciseDetailButton
-                            key={ex.id}
-                            exerciseId={ex.exercise_id}
-                            className="flex w-full items-center justify-between border-b border-line px-4 py-3 text-left transition-colors last:border-b-0 active:bg-sunken"
-                          >
-                            <span className="text-[15px] font-medium text-ink">{ex.exercise_name}</span>
-                            <span className="text-[13px] text-ink-3 tabular-nums">
-                              {ex.target_sets} sets
-                            </span>
-                          </ExerciseDetailButton>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="px-4 py-3 text-xs text-ink-3">No exercises assigned yet</p>
                     )}
-                    <div className="p-4 pt-3">
-                      <Button
-                        className="w-full min-h-13 text-[15px]"
-                        onClick={() => startWorkout(day)}
-                        disabled={starting === day.id}
-                      >
-                        {starting === day.id ? 'Starting...' : 'Start Workout'}
-                      </Button>
-                    </div>
                   </div>
-                )
-              }
-              return (
-                <div key={day.id} className="rounded-card border border-line bg-card p-4 shadow-card">
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-[15px] font-semibold text-ink">
-                        Day {day.day_number}: {day.label}
-                      </h3>
-                      {doneChip}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Link
-                        to={`/programs/${meso.id}/setup/${day.id}`}
-                        className="min-h-8 rounded-btn px-2 py-1 text-xs font-medium text-ink-3 transition-colors hover:bg-sunken hover:text-ink-2"
-                      >
-                        Edit
-                      </Link>
-                      <button
-                        onClick={() => startWorkout(day)}
-                        disabled={starting === day.id}
-                        className="min-h-8 rounded-btn border border-line-2 bg-card px-3 py-1 text-xs font-semibold text-ink transition-all hover:bg-sunken active:scale-[0.97] disabled:opacity-50"
-                      >
-                        {starting === day.id ? 'Starting...' : 'Start Workout'}
-                      </button>
-                    </div>
-                  </div>
-                  {day.exercises && day.exercises.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {day.exercises.map(ex => (
-                        <ExerciseDetailButton
-                          key={ex.id}
-                          exerciseId={ex.exercise_id}
-                          className="inline-flex items-center rounded-md bg-sunken px-2 py-1 text-xs text-ink-2 transition-colors hover:bg-wash hover:text-accent"
+                  {open && (
+                    <>
+                      {day.exercises && day.exercises.length > 0 ? (
+                        <div>
+                          {day.exercises.map(ex => (
+                            <ExerciseDetailButton
+                              key={ex.id}
+                              exerciseId={ex.exercise_id}
+                              className="flex w-full items-center justify-between border-b border-line px-4 py-3 text-left transition-colors last:border-b-0 active:bg-sunken"
+                            >
+                              <span className="text-[15px] font-medium text-ink">{ex.exercise_name}</span>
+                              <span className="text-[13px] text-ink-3 tabular-nums">
+                                {ex.target_sets} sets
+                              </span>
+                            </ExerciseDetailButton>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="px-4 py-3 text-xs text-ink-3">No exercises assigned yet</p>
+                      )}
+                      <div className="p-4 pt-3">
+                        <Button
+                          className="w-full min-h-13 text-[15px]"
+                          onClick={() => startWorkout(day)}
+                          disabled={starting === day.id}
                         >
-                          {ex.exercise_name}
-                          <span className="ml-1 text-ink-4">{ex.target_sets}s</span>
-                        </ExerciseDetailButton>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-ink-3">No exercises assigned yet</p>
+                          {starting === day.id ? 'Starting...' : 'Start Workout'}
+                        </Button>
+                      </div>
+                    </>
                   )}
                 </div>
               )
