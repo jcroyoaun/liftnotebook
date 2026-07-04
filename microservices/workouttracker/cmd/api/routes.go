@@ -18,6 +18,10 @@ func (app *application) routes() http.Handler {
 	// Auth (public)
 	router.HandlerFunc(http.MethodPost, "/v1/users/register", app.registerUserHandler)
 	router.HandlerFunc(http.MethodPost, "/v1/users/login", app.loginUserHandler)
+	router.HandlerFunc(http.MethodPut, "/v1/users/password", app.resetPasswordHandler)
+
+	// Account
+	router.HandlerFunc(http.MethodPost, "/v1/me/password", app.requireAuth(app.changePasswordHandler))
 
 	// Exercises (public, read-only from shared DB)
 	router.HandlerFunc(http.MethodGet, "/v1/exercises", app.listExercisesHandler)
@@ -46,6 +50,18 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodPost, "/v1/sets", app.requireAuth(app.logSetHandler))
 	router.HandlerFunc(http.MethodPatch, "/v1/sets/:id", app.requireAuth(app.updateSetHandler))
 	router.HandlerFunc(http.MethodDelete, "/v1/sets/:id", app.requireAuth(app.deleteSetHandler))
+
+	// Program templates (browse for everyone, writes are admin-only)
+	router.HandlerFunc(http.MethodGet, "/v1/templates", app.requireAuth(app.listTemplatesHandler))
+	router.HandlerFunc(http.MethodGet, "/v1/templates/:id", app.requireAuth(app.getTemplateHandler))
+	router.HandlerFunc(http.MethodPost, "/v1/templates/:id/start", app.requireAuth(app.startTemplateHandler))
+	router.HandlerFunc(http.MethodPost, "/v1/templates", app.requireAdmin(app.createTemplateHandler))
+	router.HandlerFunc(http.MethodPut, "/v1/templates/:id", app.requireAdmin(app.updateTemplateHandler))
+	router.HandlerFunc(http.MethodDelete, "/v1/templates/:id", app.requireAdmin(app.deleteTemplateHandler))
+
+	// Admin
+	router.HandlerFunc(http.MethodGet, "/v1/admin/users", app.requireAdmin(app.listUsersHandler))
+	router.HandlerFunc(http.MethodPost, "/v1/admin/users/:id/reset-token", app.requireAdmin(app.createPasswordResetTokenHandler))
 
 	// Analytics
 	router.HandlerFunc(http.MethodPost, "/v1/volume/preview", app.requireAuth(app.previewVolumeHandler))

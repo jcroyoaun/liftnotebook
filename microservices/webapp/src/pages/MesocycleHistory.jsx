@@ -51,17 +51,26 @@ export default function MesocycleHistory() {
         title="Programs"
         subtitle="Your training blocks"
         action={
-          <Link to="/programs/new"
-            className="inline-flex min-h-11 items-center rounded-btn bg-accent-solid px-3.5 text-sm font-semibold text-on-accent transition-all active:scale-[0.97] active:bg-accent-press">
-            New block
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/programs/templates"
+              className="inline-flex min-h-11 items-center rounded-btn border border-line-2 bg-card px-3.5 text-sm font-semibold text-ink-2 transition-all active:scale-[0.97] active:bg-sunken">
+              Templates
+            </Link>
+            <Link to="/programs/new"
+              className="inline-flex min-h-11 items-center rounded-btn bg-accent-solid px-3.5 text-sm font-semibold text-on-accent transition-all active:scale-[0.97] active:bg-accent-press">
+              New block
+            </Link>
+          </div>
         }
       />
 
       {mesocycles.length === 0 ? (
         <div className="py-16 text-center">
           <p className="mb-1 font-medium text-ink-2">No training blocks yet</p>
-          <p className="text-sm text-ink-3">Create one to start logging workouts.</p>
+          <p className="text-sm text-ink-3">
+            Create one to start logging workouts, or{' '}
+            <Link to="/programs/templates" className="font-medium text-accent hover:underline">start from a template</Link>.
+          </p>
         </div>
       ) : (
         <div className="space-y-2.5">

@@ -12,8 +12,10 @@ var (
 
 type Models struct {
 	Users           UserModel
+	Tokens          TokenModel
 	Mesocycles      MesocycleModel
 	TrainingDays    TrainingDayModel
+	Templates       TemplateModel
 	WorkoutSessions WorkoutSessionModel
 	WorkoutSets     WorkoutSetModel
 	Exercises       ExerciseReader
@@ -25,8 +27,10 @@ type Models struct {
 func NewModels(db *sql.DB) Models {
 	return Models{
 		Users:           UserModel{DB: db},
+		Tokens:          TokenModel{DB: db},
 		Mesocycles:      MesocycleModel{DB: db},
 		TrainingDays:    TrainingDayModel{DB: db},
+		Templates:       TemplateModel{DB: db},
 		WorkoutSessions: WorkoutSessionModel{DB: db},
 		WorkoutSets:     WorkoutSetModel{DB: db},
 		Exercises:       ExerciseReader{DB: db},

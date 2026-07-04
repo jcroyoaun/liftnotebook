@@ -25,6 +25,10 @@ export function getUser() {
   }
 }
 
+export function isAdmin() {
+  return getUser()?.role === 'admin'
+}
+
 export function isTokenValid() {
   const token = getToken()
   if (!token) return false

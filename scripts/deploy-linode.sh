@@ -67,14 +67,23 @@ wait_for_secret() {
 }
 
 ensure_bootstrap_configmaps() {
-  kubectl --kubeconfig "${KUBECONFIG_PATH}" -n exerciselib create configmap exerciselib-db-bootstrap-sql \
-    --from-file=schema.sql="${ROOT_DIR}/k8s/sql/exerciselib-init.sql" \
-    --from-file=seed.sql="${ROOT_DIR}/dumps/seed.sql" \
-    --dry-run=client -o yaml | kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f -
-
   kubectl --kubeconfig "${KUBECONFIG_PATH}" -n liftnotebook create configmap liftnotebook-db-bootstrap-sql \
     --from-file=schema.sql="${ROOT_DIR}/microservices/workouttracker/migrations/000001_init.up.sql" \
     --from-file=seed.sql="${ROOT_DIR}/dumps/seed.sql" \
+    --dry-run=client -o yaml | kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f -
+}
+
+# exerciselib shares liftnotebook-db (single catalog database). The operator
+# only writes the credential secret into the liftnotebook namespace, so mirror
+# it for the exerciselib pods — same pattern as the jwt-secret mirror below.
+mirror_liftnotebook_db_credentials() {
+  local username password
+  username="$(kubectl --kubeconfig "${KUBECONFIG_PATH}" -n liftnotebook get secret liftnotebook-app.liftnotebook-db.credentials.postgresql.acid.zalan.do -o jsonpath='{.data.username}' | base64 -d)"
+  password="$(kubectl --kubeconfig "${KUBECONFIG_PATH}" -n liftnotebook get secret liftnotebook-app.liftnotebook-db.credentials.postgresql.acid.zalan.do -o jsonpath='{.data.password}' | base64 -d)"
+
+  kubectl --kubeconfig "${KUBECONFIG_PATH}" -n exerciselib create secret generic liftnotebook-db-credentials \
+    --from-literal=username="${username}" \
+    --from-literal=password="${password}" \
     --dry-run=client -o yaml | kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f -
 }
 
@@ -145,10 +154,8 @@ ensure_exerciselib_secret() {
 }
 
 apply_bootstrap_jobs() {
-  kubectl --kubeconfig "${KUBECONFIG_PATH}" -n exerciselib delete job exerciselib-db-bootstrap --ignore-not-found
   kubectl --kubeconfig "${KUBECONFIG_PATH}" -n liftnotebook delete job liftnotebook-db-bootstrap --ignore-not-found
   kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -k "${ROOT_DIR}/k8s/environments/linode/bootstrap"
-  kubectl --kubeconfig "${KUBECONFIG_PATH}" wait -n exerciselib --for=condition=complete job/exerciselib-db-bootstrap --timeout=600s
   kubectl --kubeconfig "${KUBECONFIG_PATH}" wait -n liftnotebook --for=condition=complete job/liftnotebook-db-bootstrap --timeout=600s
 }
 
@@ -327,13 +334,12 @@ fi
 
 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -k "${ROOT_DIR}/k8s/environments/linode/databases"
 
-wait_for_postgres exerciselib exerciselib-db
 wait_for_postgres liftnotebook liftnotebook-db
-wait_for_secret exerciselib exerciselib-app.exerciselib-db.credentials.postgresql.acid.zalan.do
 wait_for_secret liftnotebook liftnotebook-app.liftnotebook-db.credentials.postgresql.acid.zalan.do
 
 ensure_liftnotebook_secret
 ensure_exerciselib_secret
+mirror_liftnotebook_db_credentials
 
 if [[ "${RUN_DB_BOOTSTRAP}" == "true" ]]; then
   ensure_bootstrap_configmaps

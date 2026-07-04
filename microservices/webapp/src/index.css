@@ -184,6 +184,37 @@ body {
   color: transparent;
 }
 
+/* auth pages only: soft cobalt aurora behind the card — pure decoration,
+   built from the wordmark gradient stops so it flips with the theme */
+.auth-aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.auth-aurora::before,
+.auth-aurora::after {
+  content: '';
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+}
+.auth-aurora::before {
+  width: 420px;
+  height: 420px;
+  left: 50%;
+  top: -160px;
+  transform: translateX(-70%);
+  background: color-mix(in srgb, var(--grad-from) 20%, transparent);
+}
+.auth-aurora::after {
+  width: 360px;
+  height: 360px;
+  right: -120px;
+  bottom: -140px;
+  background: color-mix(in srgb, var(--grad-to) 14%, transparent);
+}
+
 :focus-visible {
   outline: 2px solid var(--accent-fg);
   outline-offset: 2px;

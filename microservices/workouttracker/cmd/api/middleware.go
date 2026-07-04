@@ -11,7 +11,10 @@ import (
 
 type contextKey string
 
-const userContextKey = contextKey("user")
+const (
+	userContextKey = contextKey("user")
+	roleContextKey = contextKey("role")
+)
 
 func (app *application) contextSetUserID(r *http.Request, userID int64) *http.Request {
 	ctx := context.WithValue(r.Context(), userContextKey, userID)
@@ -24,6 +27,19 @@ func (app *application) contextGetUserID(r *http.Request) int64 {
 		panic("missing user ID in request context")
 	}
 	return id
+}
+
+func (app *application) contextSetUserRole(r *http.Request, role string) *http.Request {
+	ctx := context.WithValue(r.Context(), roleContextKey, role)
+	return r.WithContext(ctx)
+}
+
+func (app *application) contextGetUserRole(r *http.Request) string {
+	role, ok := r.Context().Value(roleContextKey).(string)
+	if !ok {
+		return "user"
+	}
+	return role
 }
 
 func (app *application) requireAuth(next http.HandlerFunc) http.HandlerFunc {
@@ -66,8 +82,25 @@ func (app *application) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		r = app.contextSetUserID(r, int64(userIDFloat))
+
+		role, _ := claims["role"].(string)
+		if role == "" {
+			role = "user"
+		}
+		r = app.contextSetUserRole(r, role)
+
 		next.ServeHTTP(w, r)
 	}
+}
+
+func (app *application) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
+	return app.requireAuth(func(w http.ResponseWriter, r *http.Request) {
+		if app.contextGetUserRole(r) != "admin" {
+			app.errorResponse(w, r, http.StatusForbidden, "admin privileges required")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (app *application) enableCORS(next http.Handler) http.Handler {

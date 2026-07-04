@@ -26,18 +26,23 @@ spec:
             - -port=4000
             - -limiter-enabled=false
           env:
+            # Shared catalog: exerciselib reads/writes the SAME database as
+            # workouttracker (liftnotebook-db, cross-namespace FQDN). The
+            # credentials are mirrored into this namespace by the deploy
+            # script (liftnotebook-db-credentials) — namespaces don't share
+            # secrets, same pattern as the jwt-secret mirror.
             - name: DB_USER
               valueFrom:
                 secretKeyRef:
-                  name: exerciselib-app.exerciselib-db.credentials.postgresql.acid.zalan.do
+                  name: liftnotebook-db-credentials
                   key: username
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: exerciselib-app.exerciselib-db.credentials.postgresql.acid.zalan.do
+                  name: liftnotebook-db-credentials
                   key: password
             - name: EXERCISELIB_DB_DSN
-              value: postgres://$(DB_USER):$(DB_PASSWORD)@exerciselib-db:5432/exerciselib?sslmode=disable
+              value: postgres://$(DB_USER):$(DB_PASSWORD)@liftnotebook-db.liftnotebook.svc.cluster.local:5432/liftnotebook?sslmode=disable
             - name: ADMIN_API_KEY
               valueFrom:
                 secretKeyRef:

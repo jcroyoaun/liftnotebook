@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import { getUser } from '../auth/session'
 import { getLatestWeeklyVolume } from './dashboardVolume'
 import ExerciseDetailButton from '../components/ExerciseDetailButton'
 import StatTile from '../components/ui/StatTile'
@@ -112,19 +113,27 @@ export default function Dashboard() {
   if (loading) return <PageSkeleton />
 
   if (!meso) {
+    const firstName = (getUser()?.name || '').split(' ')[0]
     return (
       <div className="space-y-4">
-        <div className="py-16 text-center">
-          <h2 className="font-display mb-2 text-[26px] font-semibold text-ink">Welcome!</h2>
-          <p className="mx-auto mb-8 max-w-60 text-[15px] text-ink-3">
-            Create your first training block to start logging workouts.
+        <div className="py-16 text-center animate-rise">
+          <h2 className="font-display mb-2 text-[26px] font-semibold text-ink">
+            Welcome{firstName ? `, ${firstName}` : ''}!
+          </h2>
+          <p className="mx-auto mb-8 max-w-64 text-[15px] text-ink-3">
+            Every good block starts on paper. Create yours to start logging workouts.
           </p>
-          <Link
-            to="/programs/new"
-            className="inline-flex min-h-12 items-center justify-center rounded-btn bg-accent-solid px-6 text-sm font-semibold text-on-accent transition-all active:scale-[0.97] active:bg-accent-press"
-          >
-            Create training block
-          </Link>
+          <div className="flex flex-col items-center gap-3">
+            <Link
+              to="/programs/new"
+              className="inline-flex min-h-12 items-center justify-center rounded-btn bg-accent-solid px-6 text-sm font-semibold text-on-accent transition-all active:scale-[0.97] active:bg-accent-press"
+            >
+              Create training block
+            </Link>
+            <Link to="/programs/templates" className="text-sm font-medium text-accent hover:underline">
+              or start from a template
+            </Link>
+          </div>
         </div>
       </div>
     )
@@ -167,13 +176,17 @@ export default function Dashboard() {
   )
 
   const todayLine = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  const firstName = (getUser()?.name || '').split(' ')[0]
+  const hour = new Date().getHours()
+  const daypart = hour < 5 ? 'Late night' : hour < 12 ? 'Morning' : hour < 18 ? 'Afternoon' : 'Evening'
+  const greetingLine = firstName ? `${daypart}, ${firstName} · ${todayLine}` : todayLine
 
   return (
     <div className="space-y-5">
       {/* Block header */}
       <div>
         <div className="flex items-center justify-between">
-          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-accent">{todayLine}</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-accent">{greetingLine}</div>
           <div className="flex shrink-0 gap-1">
             <button
               onClick={() => setConfirmAction('end')}

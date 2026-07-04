@@ -15,9 +15,10 @@ are just different per-exercise target values.
 - `microservices/webapp/` — React 19 + Vite + Tailwind 4 + Recharts + TanStack
   Query PWA. Offline set logging via IndexedDB-persisted mutations; sets are
   idempotent per client-generated UUID (`client_id`).
-- `microservices/exerciselib/` + `frontend/` (libconsole) — exercise catalog admin,
-  slated for retirement in Phase 3 (absorb into workouttracker). Writes need
-  `X-Admin-Key`.
+- `microservices/exerciselib/` + `frontend/` (libconsole) — exercise catalog
+  admin. Shares liftnotebook-db with workouttracker (single catalog database —
+  its own Postgres was retired 2026-07): console writes are live in the app
+  immediately. Writes need an admin JWT or `X-Admin-Key` (break-glass).
 - Deploys to a tiny 2-node Linode k8s cluster (1 vCPU/2GB each) — **no new
   microservices or Postgres clusters**; extend workouttracker instead.
 
@@ -69,7 +70,8 @@ are just different per-exercise target values.
 - Webapp: `cd microservices/webapp && npm run test:unit && npm run lint && npm run build`
 - E2E (needs local stack): `npx playwright test` — 23 tests incl. offline logging.
 - Local stack: docker postgres:16 → `go run ./cmd/api -db-dsn ... -migrate-only` →
-  seed `dumps/seed.sql` → API on :4001 → `npm run dev` on :3000 (proxies /v1).
+  seed `dumps/seed.sql` → API on :4001 → `npm run dev -- --port 3000` (proxies
+  /v1; vite defaults to 5173 without the flag and e2e expects 3000).
 - Deploy: push to master → GitHub Actions builds images + commits pinned tags →
   `git pull` → `KUBECONFIG_PATH=$PWD/kubeconfig BUILD_IMAGES=false ./scripts/deploy-linode.sh`
   (kubeconfig is gitignored, lives at repo root). Fresh envs only: `RUN_DB_BOOTSTRAP=true`.
@@ -85,12 +87,24 @@ are just different per-exercise target values.
   `exerciselib-app-secrets`) — deploy script prints retrieval commands.
 - User hierarchy: `users.role` (user/admin); admins come ONLY from
   `ADMIN_EMAILS` (secret key `admin-emails`, set via `LIFTNOTEBOOK_ADMIN_EMAILS`
-  at deploy). The JWT carries `role`; exerciselib validates it (shared
-  jwt-secret, mirrored into `exerciselib-app-secrets`) for catalog writes —
-  libconsole signs in with a LiftNotebook admin account; X-Admin-Key remains
-  as break-glass. exerciselib's DB has no migration runner: catalog/schema
-  changes must be applied to it manually (workouttracker migrations 000003+
-  are written by-name/idempotent so they can be replayed there via psql).
+  at deploy). The JWT carries `role`; workouttracker's `requireAdmin`
+  middleware gates `/v1/admin/*` and template writes; exerciselib validates
+  the same JWT (shared jwt-secret, mirrored into `exerciselib-app-secrets`)
+  for catalog writes — libconsole signs in with a LiftNotebook admin account;
+  X-Admin-Key remains as break-glass.
+- Single catalog DB: exerciselib pods connect to
+  `liftnotebook-db.liftnotebook.svc.cluster.local` using the
+  `liftnotebook-db-credentials` secret (mirrored cross-namespace by the
+  deploy script). Catalog/schema changes ship as workouttracker migrations —
+  there is no second database to sync anymore. The old `exerciselib-db`
+  Postgres cluster is still running as a rollback fallback; decommission once
+  comfortable: `kubectl --kubeconfig kubeconfig delete postgresql
+  exerciselib-db -n exerciselib` (frees ~1Gi PVC + a pod on the tiny cluster).
+- Password reset is admin-assisted (no email infra by design): admins mint
+  one-time codes in Settings → Members (`POST /v1/admin/users/:id/reset-token`,
+  2h expiry, sha256-hashed in the `tokens` table); users redeem at
+  `/reset-password` (`PUT /v1/users/password`). Self-service change lives in
+  Settings (`POST /v1/me/password`).
 
 ## Roadmap (approved plan: ~/.claude/plans/cryptic-wobbling-starfish.md)
 
@@ -100,19 +114,21 @@ are just different per-exercise target values.
   ActiveWorkoutBar, read-only /sessions/:id + history, planned weekly volume,
   admin role (users.role + ADMIN_EMAILS), +16 catalog exercises + adductors
   body part + mapping repairs
+- ✅ Accounts + templates batch (2026-07): admin-assisted password reset +
+  change-password, program templates (admin-authored, one-tap "Start this
+  block" via `POST /v1/templates/:id/start`), Coach's corner admin UI
+  (template builder + members/reset codes), catalog DB unification
+  (exerciselib → liftnotebook-db, live cutover verified; old cluster pending
+  decommission), character pass (AuthShell aurora + barbell mark, dashboard
+  greeting, workout-finish summary sheet, house-voice microcopy).
 
-### Next up — owner picks from this menu (routine fires 2026-07-02 9am)
+### Next up — owner picks from this menu
 
-1. Unify exercise catalog into workouttracker, retire exerciselib service +
-   its Postgres (TOP PICK — console writes currently land in a separate DB
-   and never reach the app; also frees cluster resources). Supersedes the
-   "retire exerciselib" P3 bullet.
-2. Program templates (P2): shareable pre-built blocks friends can pick in-app.
-   Owner provides the template programs (exercise lists per day, house style).
-3. Mid-workout exercise swap (deferred from P1).
-4. Rest-timer push notification when rest ends, screen off (PWA web push).
-5. Edit-past-workout escape hatch + session notes editing (needs
+1. Mid-workout exercise swap (deferred from P1).
+2. Rest-timer push notification when rest ends, screen off (PWA web push).
+3. Edit-past-workout escape hatch + session notes editing (needs
    PATCH /v1/sessions/:id).
+4. Decommission old exerciselib-db cluster (one kubectl delete, see above).
 - Optional add-on: chart kit — src/components/charts/ (shared ChartTooltip +
   TrendChart/HBarChart wrappers baking in theme/grid/axis defaults). The
   chartTheme.js token layer is solid; the gap is hand-rolled Recharts markup

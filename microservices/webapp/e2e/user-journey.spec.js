@@ -74,6 +74,19 @@ async function loginAndGo(page, path) {
   }
 }
 
+// Helper: finish the active workout. When sets were recorded the summary
+// sheet appears first; dismiss it. When the client saw no recorded sets the
+// app navigates straight home, so the dismiss click just times out quietly.
+async function finishWorkout(page) {
+  await page.click('button:has-text("Finish")')
+  try {
+    await page.click('button:has-text("Back to Today")', { timeout: 2000 })
+  } catch {
+    // no summary sheet — nothing recorded in this client's cache
+  }
+  await expect(page).toHaveURL('/')
+}
+
 // ============================================================
 test.describe.serial('Full User Journey', () => {
 
@@ -230,8 +243,7 @@ test.describe.serial('Full User Journey', () => {
     await page.reload()
     await expect(page.locator('text=Logged').first()).toBeVisible({ timeout: 5000 })
 
-    await page.click('button:has-text("Finish")')
-    await expect(page).toHaveURL('/')
+    await finishWorkout(page)
   })
 
   test('6b. Week 1 Pull workout', async ({ page }) => {
@@ -244,8 +256,7 @@ test.describe.serial('Full User Journey', () => {
     await logRecordedSets(sessionId, 6, 3, 0, 10, 2)   // Pull-ups
     await logRecordedSets(sessionId, 8, 3, 80, 10, 2)   // Machine Row
 
-    await page.click('button:has-text("Finish")')
-    await expect(page).toHaveURL('/')
+    await finishWorkout(page)
   })
 
   test('6c. Week 1 Legs workout', async ({ page }) => {
@@ -258,8 +269,7 @@ test.describe.serial('Full User Journey', () => {
     await logRecordedSets(sessionId, 1, 3, 120, 6, 2)   // Back Squat
     await logRecordedSets(sessionId, 43, 3, 60, 10, 2)  // SSB Bulgarian
 
-    await page.click('button:has-text("Finish")')
-    await expect(page).toHaveURL('/')
+    await finishWorkout(page)
   })
 
   // 7. VERIFY VOLUME after week 1
@@ -289,8 +299,7 @@ test.describe.serial('Full User Journey', () => {
     await logRecordedSets(sessionId, 11, 3, 105, 8, 2)  // Bench heavier
     await logRecordedSets(sessionId, 9, 2, 65, 10, 1)   // OHP heavier
 
-    await page.click('button:has-text("Finish")')
-    await expect(page).toHaveURL('/')
+    await finishWorkout(page)
   })
 
   test('8b. Week 2 Pull workout', async ({ page }) => {
@@ -303,8 +312,7 @@ test.describe.serial('Full User Journey', () => {
     await logRecordedSets(sessionId, 6, 3, 5, 10, 1)
     await logRecordedSets(sessionId, 8, 3, 85, 10, 1)
 
-    await page.click('button:has-text("Finish")')
-    await expect(page).toHaveURL('/')
+    await finishWorkout(page)
   })
 
   test('8c. Week 2 Legs workout', async ({ page }) => {
@@ -317,8 +325,7 @@ test.describe.serial('Full User Journey', () => {
     await logRecordedSets(sessionId, 1, 3, 125, 6, 1)
     await logRecordedSets(sessionId, 43, 3, 65, 10, 1)
 
-    await page.click('button:has-text("Finish")')
-    await expect(page).toHaveURL('/')
+    await finishWorkout(page)
   })
 
   // 9. VERIFY PROGRESS (e1RM trends)
@@ -370,8 +377,7 @@ test.describe.serial('Full User Journey', () => {
     // Volume should be unchanged
     expect(chestAfter).toBe(chestBefore)
 
-    await page.click('button:has-text("Finish")')
-    await expect(page).toHaveURL('/')
+    await finishWorkout(page)
   })
 
   // 12. PROGRESS PAGE shows user's exercises

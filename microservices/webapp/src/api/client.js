@@ -47,6 +47,20 @@ export const api = {
   // Auth
   register: (body) => request('/users/register', { method: 'POST', body: JSON.stringify(body) }),
   login: (body) => request('/users/login', { method: 'POST', body: JSON.stringify(body) }),
+  resetPassword: (body) => request('/users/password', { method: 'PUT', body: JSON.stringify(body) }),
+  changePassword: (body) => request('/me/password', { method: 'POST', body: JSON.stringify(body) }),
+
+  // Templates
+  getTemplates: () => request('/templates'),
+  getTemplate: (id) => request(`/templates/${id}`),
+  startTemplate: (id) => request(`/templates/${id}/start`, { method: 'POST' }),
+  createTemplate: (body) => request('/templates', { method: 'POST', body: JSON.stringify(body) }),
+  updateTemplate: (id, body) => request(`/templates/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteTemplate: (id) => request(`/templates/${id}`, { method: 'DELETE' }),
+
+  // Admin
+  getAdminUsers: () => request('/admin/users'),
+  createResetToken: (userId) => request(`/admin/users/${userId}/reset-token`, { method: 'POST' }),
 
   // Exercises
   getExercises: () => request('/exercises'),
