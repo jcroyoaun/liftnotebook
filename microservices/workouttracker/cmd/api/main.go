@@ -36,12 +36,20 @@ type config struct {
 	// writes). Promotion runs at startup and on registration; there is no
 	// in-app path to admin.
 	adminEmails []string
+	// vapid holds the web-push keypair for rest-timer notifications. When
+	// either key is empty, push endpoints report the feature unconfigured
+	// and the webapp hides the toggle.
+	vapid struct {
+		publicKey  string
+		privateKey string
+	}
 }
 
 type application struct {
-	config config
-	logger *slog.Logger
-	models data.Models
+	config     config
+	logger     *slog.Logger
+	models     data.Models
+	restAlarms *restAlarmScheduler
 }
 
 func main() {
@@ -55,6 +63,8 @@ func main() {
 	flag.DurationVar(&cfg.db.maxIdleTime, "db-max-idle-time", 15*time.Minute, "PostgreSQL max connection idle time")
 	flag.StringVar(&cfg.jwt.secret, "jwt-secret", os.Getenv("JWT_SECRET"), "JWT signing secret")
 	flag.StringVar(&cfg.inviteCode, "invite-code", os.Getenv("INVITE_CODE"), "Invite code required for registration (empty = open registration)")
+	flag.StringVar(&cfg.vapid.publicKey, "vapid-public-key", os.Getenv("VAPID_PUBLIC_KEY"), "VAPID public key for web push (empty = push disabled)")
+	flag.StringVar(&cfg.vapid.privateKey, "vapid-private-key", os.Getenv("VAPID_PRIVATE_KEY"), "VAPID private key for web push (empty = push disabled)")
 	adminEmailsRaw := flag.String("admin-emails", os.Getenv("ADMIN_EMAILS"), "Comma-separated emails promoted to the admin role at startup")
 
 	migrateOnly := flag.Bool("migrate-only", false, "Run database migrations and exit")
@@ -106,9 +116,10 @@ func main() {
 	}
 
 	app := &application{
-		config: cfg,
-		logger: logger,
-		models: data.NewModels(db),
+		config:     cfg,
+		logger:     logger,
+		models:     data.NewModels(db),
+		restAlarms: newRestAlarmScheduler(),
 	}
 
 	err = app.serve()

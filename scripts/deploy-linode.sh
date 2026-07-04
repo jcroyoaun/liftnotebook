@@ -87,10 +87,16 @@ mirror_liftnotebook_db_credentials() {
     --dry-run=client -o yaml | kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f -
 }
 
+b64url() {
+  openssl base64 -A | tr '+/' '-_' | tr -d '='
+}
+
 ensure_liftnotebook_secret() {
   local jwt_secret="${LIFTNOTEBOOK_JWT_SECRET:-}"
   local invite_code="${LIFTNOTEBOOK_INVITE_CODE:-}"
   local admin_emails="${LIFTNOTEBOOK_ADMIN_EMAILS:-}"
+  local vapid_public=""
+  local vapid_private=""
 
   # Reuse values from an existing secret for anything not supplied explicitly,
   # so redeploys never rotate credentials by accident.
@@ -104,6 +110,8 @@ ensure_liftnotebook_secret() {
     if [[ -z "${admin_emails}" ]]; then
       admin_emails="$(kubectl --kubeconfig "${KUBECONFIG_PATH}" -n liftnotebook get secret liftnotebook-app-secrets -o jsonpath='{.data.admin-emails}' | base64 -d || true)"
     fi
+    vapid_public="$(kubectl --kubeconfig "${KUBECONFIG_PATH}" -n liftnotebook get secret liftnotebook-app-secrets -o jsonpath='{.data.vapid-public-key}' | base64 -d || true)"
+    vapid_private="$(kubectl --kubeconfig "${KUBECONFIG_PATH}" -n liftnotebook get secret liftnotebook-app-secrets -o jsonpath='{.data.vapid-private-key}' | base64 -d || true)"
   fi
 
   if [[ -z "${jwt_secret}" ]]; then
@@ -121,10 +129,23 @@ ensure_liftnotebook_secret() {
     echo "no admin emails configured; set LIFTNOTEBOOK_ADMIN_EMAILS (comma-separated) to grant the admin role for exercise-console writes" >&2
   fi
 
+  # VAPID keypair for rest-timer web push: P-256, base64url raw scalar/point
+  # (the format webpush-go expects). Rotating it kills existing browser
+  # subscriptions, so it is generated once and reused forever after.
+  if [[ -z "${vapid_public}" || -z "${vapid_private}" ]]; then
+    local vapid_pem
+    vapid_pem="$(openssl ecparam -name prime256v1 -genkey -noout)"
+    vapid_public="$(printf '%s\n' "${vapid_pem}" | openssl ec -pubout -outform DER 2>/dev/null | tail -c 65 | b64url)"
+    vapid_private="$(printf '%s\n' "${vapid_pem}" | openssl ec -outform DER 2>/dev/null | dd bs=1 skip=7 count=32 2>/dev/null | b64url)"
+    echo "generated new VAPID keypair for web push" >&2
+  fi
+
   kubectl --kubeconfig "${KUBECONFIG_PATH}" -n liftnotebook create secret generic liftnotebook-app-secrets \
     --from-literal=jwt-secret="${jwt_secret}" \
     --from-literal=invite-code="${invite_code}" \
     --from-literal=admin-emails="${admin_emails}" \
+    --from-literal=vapid-public-key="${vapid_public}" \
+    --from-literal=vapid-private-key="${vapid_private}" \
     --dry-run=client -o yaml | kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f -
 }
 

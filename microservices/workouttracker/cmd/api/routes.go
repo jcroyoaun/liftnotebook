@@ -44,7 +44,15 @@ func (app *application) routes() http.Handler {
 	// Workout sessions
 	router.HandlerFunc(http.MethodPost, "/v1/sessions", app.requireAuth(app.createWorkoutSessionHandler))
 	router.HandlerFunc(http.MethodGet, "/v1/sessions/:id", app.requireAuth(app.getWorkoutSessionHandler))
+	router.HandlerFunc(http.MethodPatch, "/v1/sessions/:id", app.requireAuth(app.updateWorkoutSessionHandler))
 	router.HandlerFunc(http.MethodGet, "/v1/mesocycles/:id/sessions", app.requireAuth(app.listWorkoutSessionsHandler))
+
+	// Web push (rest-timer notifications)
+	router.HandlerFunc(http.MethodGet, "/v1/push/public-key", app.requireAuth(app.getPushPublicKeyHandler))
+	router.HandlerFunc(http.MethodPut, "/v1/me/push-subscription", app.requireAuth(app.savePushSubscriptionHandler))
+	router.HandlerFunc(http.MethodDelete, "/v1/me/push-subscription", app.requireAuth(app.deletePushSubscriptionHandler))
+	router.HandlerFunc(http.MethodPost, "/v1/me/rest-alarm", app.requireAuth(app.scheduleRestAlarmHandler))
+	router.HandlerFunc(http.MethodDelete, "/v1/me/rest-alarm", app.requireAuth(app.cancelRestAlarmHandler))
 
 	// Sets
 	router.HandlerFunc(http.MethodPost, "/v1/sets", app.requireAuth(app.logSetHandler))

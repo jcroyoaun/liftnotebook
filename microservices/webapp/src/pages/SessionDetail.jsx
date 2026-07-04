@@ -2,15 +2,23 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api } from '../api/client'
 import PageHeader from '../components/ui/PageHeader'
+import BottomSheet from '../components/ui/BottomSheet'
+import Button from '../components/ui/Button'
 import { PageSkeleton } from '../components/ui/Skeleton'
+import { useToast } from '../lib/toastContext'
 import { getActiveSession } from '../lib/activeSession'
 
-// Read-only view of a logged workout: what was lifted, nothing editable.
-// The active session gets a "Continue logging" escape hatch into the logger.
+// Read-only view of a logged workout. The active session gets a "Continue
+// logging" banner; past sessions get an edit escape hatch into the same
+// logger, plus editable notes.
 export default function SessionDetail() {
   const { id } = useParams()
   const [data, setData] = useState(null)
   const [error, setError] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [notesDraft, setNotesDraft] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
+  const toast = useToast()
   const activeSession = getActiveSession()
   const isActive = activeSession && String(activeSession.id) === String(id)
 
@@ -19,6 +27,20 @@ export default function SessionDetail() {
       .then(setData)
       .catch(() => setError(true))
   }, [id])
+
+  async function saveNotes() {
+    setSavingNotes(true)
+    try {
+      const res = await api.updateSession(id, { notes: notesDraft.trim() })
+      setData((prev) => ({ ...prev, session: { ...prev.session, ...res.session } }))
+      setNotesOpen(false)
+      toast('Notes saved', 'success')
+    } catch (err) {
+      toast(err.message)
+    } finally {
+      setSavingNotes(false)
+    }
+  }
 
   if (error) return <div className="py-12 text-center text-danger">Could not load workout.</div>
   if (!data) return <PageSkeleton />
@@ -51,6 +73,16 @@ export default function SessionDetail() {
         title={session.day_label}
         subtitle={`${dateLine} · ${recordedCount} sets recorded`}
         backTo="/"
+        action={
+          !isActive && (
+            <Link
+              to={`/workout/${id}`}
+              className="inline-flex min-h-11 items-center rounded-btn border border-line-2 bg-card px-3.5 text-sm font-semibold text-ink-2 transition-all active:scale-[0.97] active:bg-sunken"
+            >
+              Edit workout
+            </Link>
+          )
+        }
       />
 
       {isActive && (
@@ -97,12 +129,39 @@ export default function SessionDetail() {
         ))
       )}
 
-      {session.notes && (
-        <div className="rounded-card border border-line bg-card p-4 shadow-card">
-          <h3 className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-ink-2">Notes</h3>
-          <p className="text-sm text-ink-2">{session.notes}</p>
+      <div className="rounded-card border border-line bg-card p-4 shadow-card">
+        <div className="mb-1 flex items-center justify-between">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-2">Notes</h3>
+          <button
+            onClick={() => { setNotesDraft(session.notes || ''); setNotesOpen(true) }}
+            className="py-1 text-[13px] font-medium text-accent"
+          >
+            {session.notes ? 'Edit notes' : 'Add notes'}
+          </button>
         </div>
-      )}
+        {session.notes ? (
+          <p className="whitespace-pre-wrap text-sm text-ink-2">{session.notes}</p>
+        ) : (
+          <p className="text-sm text-ink-3">How did it go? Sleep, pump, pain — future you will want to know.</p>
+        )}
+      </div>
+
+      <BottomSheet open={notesOpen} onClose={() => setNotesOpen(false)} title="Session notes">
+        <div className="space-y-4">
+          <textarea
+            value={notesDraft}
+            onChange={(e) => setNotesDraft(e.target.value)}
+            rows={5}
+            maxLength={2000}
+            autoFocus
+            placeholder="Bench felt heavy, slept 5h. Swapped rows for pull-ups."
+            className="w-full rounded-field border border-line-2 bg-raised px-3 py-2.5 text-[15px] text-ink placeholder:text-ink-4 transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
+          />
+          <Button onClick={saveNotes} disabled={savingNotes} className="w-full min-h-12">
+            {savingNotes ? 'Saving…' : 'Save notes'}
+          </Button>
+        </div>
+      </BottomSheet>
     </div>
   )
 }

@@ -68,6 +68,30 @@ func (m WorkoutSessionModel) Get(id, userID int64) (*WorkoutSession, error) {
 	return &session, nil
 }
 
+// Update persists edits to a past workout's date and notes; sets have their
+// own endpoints and ownership is enforced by user_id in the WHERE clause.
+func (m WorkoutSessionModel) Update(session *WorkoutSession) error {
+	query := `
+		UPDATE workout_sessions
+		SET performed_at = $1, notes = $2, version = version + 1
+		WHERE id = $3 AND user_id = $4 AND version = $5
+		RETURNING version`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := m.DB.QueryRowContext(ctx, query,
+		session.PerformedAt, session.Notes, session.ID, session.UserID, session.Version,
+	).Scan(&session.Version)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrEditConflict
+		}
+		return err
+	}
+	return nil
+}
+
 func (m WorkoutSessionModel) ListForMesocycle(userID, mesocycleID int64) ([]*WorkoutSession, error) {
 	query := `
 		SELECT ws.id, ws.user_id, ws.mesocycle_id, ws.training_day_id, td.label,

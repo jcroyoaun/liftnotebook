@@ -1,9 +1,12 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useMutationState } from '@tanstack/react-query'
+import { useMutationState, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api/client'
 import { useSessionBundle, useSyncSet, useDeleteSet } from './hooks'
+import { loadSwaps, saveSwap, clearSwaps, applySwaps, mergeExerciseOrder } from './swaps'
+import { scheduleRestAlarm, cancelRestAlarm } from '../../lib/push'
 import ExerciseLogCard from './ExerciseLogCard'
+import SwapSheet from './SwapSheet'
 import RestTimer from './RestTimer'
 import PlateCalculator from './PlateCalculator'
 import { PageSkeleton } from '../../components/ui/Skeleton'
@@ -57,6 +60,7 @@ function subscribeOnline(cb) {
 export default function WorkoutSession() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { session, suggestions } = useSessionBundle(sessionId)
   const { syncSet } = useSyncSet(sessionId)
   const deleteSet = useDeleteSet(sessionId)
@@ -73,24 +77,27 @@ export default function WorkoutSession() {
   })
   const [platesFor, setPlatesFor] = useState(null)
   const [summary, setSummary] = useState(null)
+  const [swaps, setSwaps] = useState(() => loadSwaps(sessionId))
+  const [swapFor, setSwapFor] = useState(null)
 
   function startTimer(seconds = REST_SECONDS) {
     const endsAt = Date.now() + seconds * 1000
     localStorage.setItem(TIMER_KEY, String(endsAt))
     setTimerEndsAt(endsAt)
+    scheduleRestAlarm(seconds)
   }
 
   function adjustTimer(deltaSeconds) {
-    setTimerEndsAt((prev) => {
-      const next = Math.max(Date.now(), (prev ?? Date.now()) + deltaSeconds * 1000)
-      localStorage.setItem(TIMER_KEY, String(next))
-      return next
-    })
+    const next = Math.max(Date.now(), (timerEndsAt ?? Date.now()) + deltaSeconds * 1000)
+    localStorage.setItem(TIMER_KEY, String(next))
+    setTimerEndsAt(next)
+    scheduleRestAlarm(Math.max(1, Math.round((next - Date.now()) / 1000)))
   }
 
   function dismissTimer() {
     localStorage.removeItem(TIMER_KEY)
     setTimerEndsAt(null)
+    cancelRestAlarm()
   }
 
   // Remember the in-progress session so Today can offer a resume banner.
@@ -138,6 +145,7 @@ export default function WorkoutSession() {
 
   function closeOut() {
     localStorage.removeItem(ACTIVE_SESSION_KEY)
+    clearSwaps(sessionId)
     dismissTimer()
     navigate('/')
   }
@@ -160,10 +168,32 @@ export default function WorkoutSession() {
   const { session: meta, sets, dayExercises } = session.data
   const suggestionByExercise = new Map((suggestions.data || []).map((s) => [s.exercise_id, s]))
 
-  const exerciseOrder =
-    dayExercises.length > 0
-      ? dayExercises
-      : [...new Map(sets.map((s) => [s.exercise_id, { exercise_id: s.exercise_id, exercise_name: s.exercise_name, target_sets: 2 }])).values()]
+  const exerciseOrder = mergeExerciseOrder(applySwaps(dayExercises, swaps), sets)
+
+  // Swap the exercise in `swapFor` for `newEx`. "Persist" additionally
+  // rewrites the day template (same slot, same targets) for future weeks.
+  async function performSwap(newEx, persist) {
+    const original = swapFor
+    if (persist) {
+      const rewritten = dayExercises.map((e) =>
+        e.exercise_id === original.exercise_id ? { ...e, exercise_id: newEx.id } : e
+      )
+      await api.updateDayExercises(meta.training_day_id, {
+        exercises: rewritten.map((e, i) => ({
+          exercise_id: e.exercise_id,
+          position: i + 1,
+          target_sets: e.target_sets,
+          target_rep_range_low: e.target_rep_range_low,
+          target_rep_range_high: e.target_rep_range_high,
+          target_rir: e.target_rir,
+        })),
+      })
+      queryClient.invalidateQueries({ queryKey: ['session', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['suggestions', meta.training_day_id] })
+    }
+    setSwaps(saveSwap(sessionId, original.exercise_id, { exercise_id: newEx.id, exercise_name: newEx.name }))
+    setSwapFor(null)
+  }
 
   function addSet(exercise, suggestion) {
     const existing = sets.filter((s) => s.exercise_id === exercise.exercise_id)
@@ -241,8 +271,18 @@ export default function WorkoutSession() {
           onRecordSet={recordSet}
           onDeleteSet={(set) => deleteSet.mutate(set)}
           onOpenPlates={(weight) => setPlatesFor(weight)}
+          onSwap={(exercise) => setSwapFor(exercise)}
         />
       ))}
+
+      <SwapSheet
+        open={!!swapFor}
+        exercise={swapFor}
+        excludeIds={new Set(exerciseOrder.map((e) => e.exercise_id))}
+        canPersist={!!swapFor && dayExercises.some((e) => e.exercise_id === swapFor.exercise_id)}
+        onSwap={performSwap}
+        onClose={() => setSwapFor(null)}
+      />
 
       <RestTimer endsAt={timerEndsAt} onDismiss={dismissTimer} onAdjust={adjustTimer} />
       {platesFor != null && (

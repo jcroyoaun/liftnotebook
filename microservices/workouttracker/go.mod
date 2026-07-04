@@ -10,3 +10,5 @@ require (
 )
 
 require github.com/golang-migrate/migrate/v4 v4.19.1
+
+require github.com/SherClockHolmes/webpush-go v1.4.0

@@ -229,7 +229,7 @@ test.describe.serial('Full User Journey', () => {
     await expect(page.locator('text=Flat Barbell Bench Press')).toBeVisible()
     await expect(page.locator('text=Overhead Press')).toBeVisible()
 
-    await page.getByRole('button', { name: 'Flat Barbell Bench Press' }).click()
+    await page.getByRole('button', { name: 'Flat Barbell Bench Press', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Flat Barbell Bench Press' })).toBeVisible()
     await expect(page.locator('text=Primary Muscles')).toBeVisible()
     await expect(page.locator('text=Pectoralis Major')).toBeVisible()

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { getUser, clearSession, isAdmin } from '../auth/session'
+import { isPushSupported, restAlarmEnabled, enableRestAlarm, disableRestAlarm } from '../lib/push'
 import Card from '../components/ui/Card'
 import PageHeader from '../components/ui/PageHeader'
 import BottomSheet from '../components/ui/BottomSheet'
@@ -95,6 +96,28 @@ export default function Settings() {
   const initial = (user.name || '?').charAt(0).toUpperCase()
   const { theme, setTheme } = useTheme()
   const [passwordOpen, setPasswordOpen] = useState(false)
+  const [alarmOn, setAlarmOn] = useState(() => restAlarmEnabled())
+  const [alarmBusy, setAlarmBusy] = useState(false)
+  const showToast = useToast()
+
+  async function toggleAlarm() {
+    setAlarmBusy(true)
+    try {
+      if (alarmOn) {
+        await disableRestAlarm()
+        setAlarmOn(false)
+        showToast('Rest alarm off', 'success')
+      } else {
+        await enableRestAlarm()
+        setAlarmOn(true)
+        showToast('Rest alarm on — pocket your phone, we buzz you', 'success')
+      }
+    } catch (err) {
+      showToast(err.message)
+    } finally {
+      setAlarmBusy(false)
+    }
+  }
 
   function logout() {
     clearSession()
@@ -174,6 +197,32 @@ export default function Settings() {
           <span className="text-sm text-ink">Password</span>
           <span className="text-sm font-medium text-accent">Change</span>
         </button>
+        <div className="flex min-h-12 items-center justify-between gap-3 px-4 py-3">
+          <div className="min-w-0">
+            <div className="text-sm text-ink">Rest alarm</div>
+            <div className="text-[13px] text-ink-3">
+              {isPushSupported()
+                ? 'Notification when rest ends, even with the screen off'
+                : 'Not supported here — on iPhone, install the app first'}
+            </div>
+          </div>
+          <button
+            role="switch"
+            aria-checked={alarmOn}
+            aria-label="Rest alarm notifications"
+            disabled={alarmBusy || !isPushSupported()}
+            onClick={toggleAlarm}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+              alarmOn ? 'bg-accent-solid' : 'bg-line-2'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-card transition-all ${
+                alarmOn ? 'left-[22px]' : 'left-0.5'
+              }`}
+            />
+          </button>
+        </div>
         <div className="flex min-h-12 items-center justify-between px-4 py-3">
           <span className="text-sm text-ink">Units</span>
           <span className="text-sm text-ink-3">kg · switch to lb per set while logging</span>

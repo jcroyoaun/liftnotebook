@@ -122,14 +122,22 @@ are just different per-exercise target values.
   greeting, workout-finish summary sheet, house-voice microcopy). Deployed
   2026-07-04, images sha-b051054e84fc.
 
-### Next up — owner picks from this menu
+- ✅ Training-flow batch (2026-07): mid-workout exercise swap (session-local
+  via localStorage `sessionSwaps:*` + optional persist to the day template),
+  rest-timer web push (VAPID keypair in `liftnotebook-app-secrets`
+  vapid-public/private-key, `push_subscriptions` table, in-memory per-user
+  alarm scheduler — single replica by design; Settings toggle; sw.js push
+  handler skips the banner when the app is visible), edit-past-workout
+  escape hatch (/sessions/:id → Edit workout → /workout/:id) + session
+  notes (PATCH /v1/sessions/:id). Playwright: e2e/edit-and-swap.spec.js;
+  role-name locators must use exact: true (swap buttons share exercise-name
+  substrings).
 
-1. Mid-workout exercise swap (deferred from P1).
-2. Rest-timer push notification when rest ends, screen off (PWA web push).
-3. Edit-past-workout escape hatch + session notes editing (needs
-   PATCH /v1/sessions/:id).
+### Next up
+
 - Owner still owes the house template programs (exercise lists per day) to
   seed the template catalog via Coach's corner.
+- Chart kit, app icon/splash refresh, exercise detail page (P3).
 - Optional add-on: chart kit — src/components/charts/ (shared ChartTooltip +
   TrendChart/HBarChart wrappers baking in theme/grid/axis defaults). The
   chartTheme.js token layer is solid; the gap is hand-rolled Recharts markup

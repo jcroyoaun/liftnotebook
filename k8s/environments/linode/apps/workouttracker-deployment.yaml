@@ -53,6 +53,18 @@ spec:
                   name: liftnotebook-app-secrets
                   key: admin-emails
                   optional: true
+            - name: VAPID_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: liftnotebook-app-secrets
+                  key: vapid-public-key
+                  optional: true
+            - name: VAPID_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: liftnotebook-app-secrets
+                  key: vapid-private-key
+                  optional: true
           ports:
             - name: http
               containerPort: 4001

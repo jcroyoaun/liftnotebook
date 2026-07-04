@@ -82,7 +82,15 @@ export const api = {
   // Sessions
   createSession: (body) => request('/sessions', { method: 'POST', body: JSON.stringify(body) }),
   getSession: (id) => request(`/sessions/${id}`),
+  updateSession: (id, body) => request(`/sessions/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   getMesocycleSessions: (mesoId) => request(`/mesocycles/${mesoId}/sessions`),
+
+  // Web push (rest-timer notifications)
+  getPushPublicKey: () => request('/push/public-key'),
+  savePushSubscription: (body) => request('/me/push-subscription', { method: 'PUT', body: JSON.stringify(body) }),
+  deletePushSubscription: (body) => request('/me/push-subscription', { method: 'DELETE', body: JSON.stringify(body) }),
+  scheduleRestAlarm: (body) => request('/me/rest-alarm', { method: 'POST', body: JSON.stringify(body) }),
+  cancelRestAlarm: () => request('/me/rest-alarm', { method: 'DELETE' }),
 
   // Sets
   logSet: (body) => request('/sets', { method: 'POST', body: JSON.stringify(body) }),

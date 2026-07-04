@@ -22,6 +22,7 @@ type Models struct {
 	Progress        ProgressModel
 	Progression     ProgressionModel
 	Volume          VolumeModel
+	PushSubs        PushSubscriptionModel
 }
 
 func NewModels(db *sql.DB) Models {
@@ -37,5 +38,6 @@ func NewModels(db *sql.DB) Models {
 		Progress:        ProgressModel{DB: db},
 		Progression:     ProgressionModel{DB: db},
 		Volume:          VolumeModel{DB: db},
+		PushSubs:        PushSubscriptionModel{DB: db},
 	}
 }

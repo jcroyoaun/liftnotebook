@@ -46,3 +46,38 @@ registerRoute(
   new NetworkOnly({ plugins: [setSyncQueue] }),
   'POST',
 )
+
+// Rest-timer push: the server fires this when rest ends. Skip the banner
+// when the app is visible — the in-app timer bar already covers that case.
+self.addEventListener('push', (event) => {
+  event.waitUntil(
+    (async () => {
+      const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      if (wins.some((w) => w.visibilityState === 'visible')) return
+      let data = {}
+      try {
+        data = event.data?.json() ?? {}
+      } catch {
+        // Non-JSON payload — fall back to defaults.
+      }
+      await self.registration.showNotification(data.title || 'Rest over — lift!', {
+        body: data.body || 'Next set is waiting.',
+        icon: '/pwa-192.png?v=3',
+        badge: '/pwa-192.png?v=3',
+        tag: 'rest-timer',
+        vibrate: [200, 100, 200],
+      })
+    })(),
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  event.waitUntil(
+    (async () => {
+      const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      if (wins.length > 0) return wins[0].focus()
+      return self.clients.openWindow('/')
+    })(),
+  )
+})

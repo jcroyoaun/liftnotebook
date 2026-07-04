@@ -104,6 +104,79 @@ func (app *application) getWorkoutSessionHandler(w http.ResponseWriter, r *http.
 	}
 }
 
+// updateWorkoutSessionHandler is the edit-past-workout escape hatch: date and
+// notes only. Set edits go through the set endpoints via /workout/:id.
+func (app *application) updateWorkoutSessionHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	userID := app.contextGetUserID(r)
+
+	session, err := app.models.WorkoutSessions.Get(id, userID)
+	if err != nil {
+		if errors.Is(err, data.ErrRecordNotFound) {
+			app.notFoundResponse(w, r)
+			return
+		}
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	var input struct {
+		PerformedAt *string `json:"performed_at"`
+		Notes       *string `json:"notes"`
+	}
+
+	err = app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	if input.PerformedAt != nil {
+		performedAt, err := time.Parse(time.RFC3339, *input.PerformedAt)
+		if err != nil {
+			v := validator.New()
+			v.AddError("performed_at", "must be a valid RFC3339 timestamp")
+			app.failedValidationResponse(w, r, v.Errors)
+			return
+		}
+		session.PerformedAt = performedAt
+	}
+	if input.Notes != nil {
+		v := validator.New()
+		v.Check(len(*input.Notes) <= 2000, "notes", "must not be more than 2000 characters")
+		if !v.Valid() {
+			app.failedValidationResponse(w, r, v.Errors)
+			return
+		}
+		if *input.Notes == "" {
+			session.Notes = nil
+		} else {
+			session.Notes = input.Notes
+		}
+	}
+
+	err = app.models.WorkoutSessions.Update(session)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			app.errorResponse(w, r, http.StatusConflict, "unable to update the record, please try again")
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"session": session}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
 func (app *application) listWorkoutSessionsHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readIDParam(r)
 	if err != nil {

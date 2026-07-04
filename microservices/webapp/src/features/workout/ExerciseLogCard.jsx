@@ -7,7 +7,7 @@ function formatLast(last) {
   return `${last.weight} kg × ${last.reps}${rir}`
 }
 
-export default function ExerciseLogCard({ exercise, suggestion, sets, onAddSet, onChangeSet, onRecordSet, onDeleteSet, onOpenPlates }) {
+export default function ExerciseLogCard({ exercise, suggestion, sets, onAddSet, onChangeSet, onRecordSet, onDeleteSet, onOpenPlates, onSwap }) {
   const recordedCount = sets.filter((s) => s.recorded).length
   const complete = recordedCount >= exercise.target_sets
   const last = suggestion?.last_performance
@@ -39,8 +39,26 @@ export default function ExerciseLogCard({ exercise, suggestion, sets, onAddSet, 
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 9v6m3-8v10m3-12v14m4-14v14m3-12v10m3-8v6" />
               </svg>
             </button>
+            {onSwap && (
+              <button
+                type="button"
+                onClick={() => onSwap(exercise)}
+                aria-label={`swap ${exercise.exercise_name}`}
+                className="grid h-11 w-9 place-items-center text-ink-3 transition-colors active:text-ink"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
+
+        {exercise.swapped_from && (
+          <div className="mt-1 text-[11px] text-ink-3">
+            Swapped in today — usually {exercise.swapped_from}
+          </div>
+        )}
 
         {suggestion && (
           <div className="mt-1.5 text-xs">
