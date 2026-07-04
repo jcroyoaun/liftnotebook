@@ -272,6 +272,7 @@ test.describe.serial('Full User Journey', () => {
 
     await page.getByRole('button', { name: 'Flat Barbell Bench Press', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Flat Barbell Bench Press' })).toBeVisible()
+    await expect(page.getByTestId('exercise-art').first()).toBeVisible()
     await expect(page.locator('text=Primary Muscles')).toBeVisible()
     await expect(page.locator('text=Pectoralis Major')).toBeVisible()
     await page.getByRole('button', { name: 'Close', exact: true }).click()

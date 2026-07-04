@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import ExerciseDetailButton from '../components/ExerciseDetailButton'
+import ExerciseArt from '../components/ExerciseArt'
 import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
@@ -312,10 +313,11 @@ export default function AdminTemplateEditor() {
                 <button
                   key={ex.id}
                   onClick={() => addExercise(ex)}
-                  className="flex min-h-11 w-full items-center justify-between px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-wash active:bg-wash"
+                  className="flex min-h-11 w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-ink transition-colors hover:bg-wash active:bg-wash"
                 >
-                  <span>{ex.name}</span>
-                  <span className="text-xs text-ink-4">{ex.movement_pattern}</span>
+                  <ExerciseArt exerciseId={ex.id} className="h-9 w-9 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate">{ex.name}</span>
+                  <span className="shrink-0 text-xs text-ink-4">{ex.movement_pattern}</span>
                 </button>
               ))}
             </div>
