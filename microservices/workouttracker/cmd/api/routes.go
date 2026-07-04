@@ -34,6 +34,7 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodGet, "/v1/mesocycles/:id", app.requireAuth(app.getMesocycleHandler))
 	router.HandlerFunc(http.MethodPost, "/v1/mesocycles/:id/end", app.requireAuth(app.endMesocycleHandler))
 	router.HandlerFunc(http.MethodDelete, "/v1/mesocycles/:id", app.requireAuth(app.deleteMesocycleHandler))
+	router.HandlerFunc(http.MethodGet, "/v1/mesocycles/:id/export", app.requireAuth(app.exportMesocycleHandler))
 
 	router.HandlerFunc(http.MethodGet, "/v1/me/exercises", app.requireAuth(app.listUserExercisesHandler))
 

@@ -476,6 +476,28 @@ test.describe.serial('Full User Journey', () => {
   })
 
   // 14. DELETE MESOCYCLE
+  // 13b. EXPORT — JSON takeout + CSV set log, with real download assertions
+  test('13b. Export a block as JSON and CSV', async ({ page }) => {
+    await loginAndGo(page, '/programs/history')
+
+    await page.click('button[aria-label="export E2E Test Meso"]')
+    const jsonDl = page.waitForEvent('download')
+    await page.click('button:has-text("Everything · JSON")')
+    expect((await jsonDl).suggestedFilename()).toBe('liftnotebook-e2e-test-meso.json')
+
+    // Sheet closes on success; reopen for the set-log CSV.
+    await page.click('button[aria-label="export E2E Test Meso"]')
+    const csvDl = page.waitForEvent('download')
+    await page.click('button:has-text("Set log · CSV")')
+    const csv = await csvDl
+    expect(csv.suggestedFilename()).toBe('liftnotebook-e2e-test-meso-history.csv')
+
+    const fs = await import('node:fs')
+    const content = fs.readFileSync(await csv.path(), 'utf8')
+    expect(content).toContain('date,day_label,exercise,set_number,weight_kg,reps,rir,recorded')
+    expect(content).toContain('Flat Barbell Bench Press')
+  })
+
   test('14. Delete mesocycle', async ({ page }) => {
     await loginAndGo(page, '/programs/history')
     await expect(page.locator('text=E2E Test Meso')).toBeVisible()

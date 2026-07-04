@@ -123,6 +123,42 @@ func (m WorkoutSetModel) GetForSession(sessionID int64) ([]WorkoutSet, error) {
 	return sets, rows.Err()
 }
 
+// GetForMesocycle returns every set in a block (ownership enforced through
+// the sessions join) — the data half of a block export.
+func (m WorkoutSetModel) GetForMesocycle(userID, mesocycleID int64) ([]WorkoutSet, error) {
+	query := `
+		SELECT ws.id, ws.workout_session_id, ws.exercise_id, e.name,
+		       ws.set_number, ws.weight, ws.reps, ws.rir, ws.recorded, ws.client_id, ws.created_at, ws.version
+		FROM workout_sets ws
+		JOIN exercises e ON ws.exercise_id = e.id
+		JOIN workout_sessions sess ON ws.workout_session_id = sess.id
+		WHERE sess.user_id = $1 AND sess.mesocycle_id = $2
+		ORDER BY ws.workout_session_id, ws.exercise_id, ws.set_number`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	rows, err := m.DB.QueryContext(ctx, query, userID, mesocycleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sets []WorkoutSet
+	for rows.Next() {
+		var s WorkoutSet
+		err := rows.Scan(
+			&s.ID, &s.WorkoutSessionID, &s.ExerciseID, &s.ExerciseName,
+			&s.SetNumber, &s.Weight, &s.Reps, &s.RIR, &s.Recorded, &s.ClientID, &s.CreatedAt, &s.Version,
+		)
+		if err != nil {
+			return nil, err
+		}
+		sets = append(sets, s)
+	}
+	return sets, rows.Err()
+}
+
 func (m WorkoutSetModel) Delete(id int64) error {
 	query := `DELETE FROM workout_sets WHERE id = $1`
 

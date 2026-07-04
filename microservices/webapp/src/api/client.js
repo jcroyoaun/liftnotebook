@@ -73,6 +73,7 @@ export const api = {
   getActiveMesocycle: () => request('/me/mesocycle'),
   getMesocycle: (id) => request(`/mesocycles/${id}`),
   endMesocycle: (id) => request(`/mesocycles/${id}/end`, { method: 'POST' }),
+  exportMesocycle: (id) => request(`/mesocycles/${id}/export`),
   deleteMesocycle: (id) => request(`/mesocycles/${id}`, { method: 'DELETE' }),
 
   // Training day exercises

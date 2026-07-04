@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import PageHeader from '../components/ui/PageHeader'
+import BottomSheet from '../components/ui/BottomSheet'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useToast } from '../lib/toastContext'
+import { toProgramCSV, toHistoryCSV, blockSlug, downloadFile } from '../lib/exportBlock'
 
 function formatRange(m) {
   const start = new Date(m.started_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -17,7 +19,32 @@ export default function MesocycleHistory() {
   const [mesocycles, setMesocycles] = useState([])
   const [loading, setLoading] = useState(true)
   const [confirmTarget, setConfirmTarget] = useState(null)
+  const [exportTarget, setExportTarget] = useState(null)
+  const [exporting, setExporting] = useState(false)
   const toast = useToast()
+
+  // Fetch the block dump once per format click and hand it to the browser
+  // as a file — JSON is the canonical takeout, CSVs are flattenings.
+  async function runExport(format) {
+    setExporting(true)
+    try {
+      const data = await api.exportMesocycle(exportTarget.id)
+      const slug = blockSlug(exportTarget.name)
+      if (format === 'json') {
+        downloadFile(`liftnotebook-${slug}.json`, JSON.stringify(data, null, 2), 'application/json')
+      } else if (format === 'program') {
+        downloadFile(`liftnotebook-${slug}-program.csv`, toProgramCSV(data), 'text/csv')
+      } else {
+        downloadFile(`liftnotebook-${slug}-history.csv`, toHistoryCSV(data), 'text/csv')
+      }
+      toast('Export downloaded', 'success')
+      setExportTarget(null)
+    } catch (err) {
+      toast(err.message)
+    } finally {
+      setExporting(false)
+    }
+  }
 
   useEffect(() => {
     api.getMesocycles()
@@ -92,6 +119,14 @@ export default function MesocycleHistory() {
                 </Link>
                 <div className="flex shrink-0 items-center gap-1">
                   <button
+                    onClick={() => setExportTarget(m)}
+                    aria-label={`export ${m.name}`}
+                    className="grid h-11 w-11 place-items-center rounded-full text-ink-4 transition-colors hover:bg-sunken hover:text-ink-2 active:text-ink">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4" />
+                    </svg>
+                  </button>
+                  <button
                     onClick={() => setConfirmTarget(m)}
                     aria-label={`delete ${m.name}`}
                     className="grid h-11 w-11 place-items-center rounded-full text-ink-4 transition-colors hover:bg-danger-wash hover:text-danger active:text-danger">
@@ -108,6 +143,44 @@ export default function MesocycleHistory() {
           ))}
         </div>
       )}
+
+      <BottomSheet open={!!exportTarget} onClose={() => setExportTarget(null)} title={`Export "${exportTarget?.name}"`}>
+        <div className="space-y-3">
+          <button
+            onClick={() => runExport('json')}
+            disabled={exporting}
+            className="flex min-h-14 w-full items-center justify-between rounded-field border border-line bg-raised px-4 text-left transition-colors active:bg-sunken disabled:opacity-50"
+          >
+            <div>
+              <div className="text-sm font-semibold text-ink">Everything · JSON</div>
+              <div className="text-[13px] text-ink-3">Program + every logged session and set</div>
+            </div>
+            <span className="text-xs font-medium text-accent">.json</span>
+          </button>
+          <button
+            onClick={() => runExport('program')}
+            disabled={exporting}
+            className="flex min-h-14 w-full items-center justify-between rounded-field border border-line bg-raised px-4 text-left transition-colors active:bg-sunken disabled:opacity-50"
+          >
+            <div>
+              <div className="text-sm font-semibold text-ink">Program · CSV</div>
+              <div className="text-[13px] text-ink-3">Days, exercises and targets — spreadsheet-ready</div>
+            </div>
+            <span className="text-xs font-medium text-accent">.csv</span>
+          </button>
+          <button
+            onClick={() => runExport('history')}
+            disabled={exporting}
+            className="flex min-h-14 w-full items-center justify-between rounded-field border border-line bg-raised px-4 text-left transition-colors active:bg-sunken disabled:opacity-50"
+          >
+            <div>
+              <div className="text-sm font-semibold text-ink">Set log · CSV</div>
+              <div className="text-[13px] text-ink-3">One row per set: date, exercise, kg, reps, RIR</div>
+            </div>
+            <span className="text-xs font-medium text-accent">.csv</span>
+          </button>
+        </div>
+      </BottomSheet>
 
       <ConfirmSheet
         open={!!confirmTarget}
