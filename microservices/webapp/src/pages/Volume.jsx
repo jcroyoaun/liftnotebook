@@ -6,18 +6,29 @@ import { useChartTheme } from '../lib/chartTheme'
 import PageHeader from '../components/ui/PageHeader'
 import { Skeleton } from '../components/ui/Skeleton'
 
+const round1 = (n) => Math.round(n * 10) / 10
+
+function splitLine(primary, secondary) {
+  if (!secondary) return `${round1(primary)} primary`
+  if (!primary) return `${round1(secondary)} secondary ×½`
+  return `${round1(primary)} primary + ${round1(secondary)} secondary ×½`
+}
+
 function VolumeTooltip({ active, payload, unit }) {
   if (!active || !payload?.length) return null
   const p = payload[0].payload
   return (
     <div className="rounded-lg border border-line bg-raised px-3 py-2 text-xs shadow-raised">
       <div className="font-medium text-ink">{p.name}</div>
-      <div className="mt-0.5 text-ink-3">{p.sets} working sets{unit ? ` ${unit}` : ''}</div>
+      <div className="mt-0.5 tabular-nums text-ink-2">{p.sets} working sets{unit ? ` ${unit}` : ''}</div>
+      <div className="mt-0.5 tabular-nums text-ink-3">{splitLine(p.primaryRaw, p.secondaryRaw)}</div>
     </div>
   )
 }
 
-// One body-part volume block: horizontal bar chart + expandable muscle list.
+// One body-part volume block: stacked horizontal bars — primary work and
+// ½-credited secondary work as two steps of the same hue, so bar length IS
+// the merged total — plus an expandable per-muscle rundown.
 // Rendered twice on this page (planned and performed), so state lives here.
 function VolumePanel({ volume, unit }) {
   const [expanded, setExpanded] = useState(null)
@@ -25,19 +36,39 @@ function VolumePanel({ volume, unit }) {
 
   const chartData = volume.map(bp => ({
     name: bp.body_part.charAt(0).toUpperCase() + bp.body_part.slice(1),
-    sets: Math.round(bp.total_sets * 10) / 10,
+    primary: round1(bp.primary_sets || 0),
+    secondaryCredit: round1((bp.secondary_sets || 0) * 0.5),
+    primaryRaw: bp.primary_sets || 0,
+    secondaryRaw: bp.secondary_sets || 0,
+    sets: round1(bp.total_sets),
   }))
+  const hasSecondary = chartData.some(d => d.secondaryCredit > 0)
 
   return (
     <>
       <div className="rounded-card border border-line bg-card p-4 shadow-card">
+        {hasSecondary && (
+          <div className="mb-2 flex items-center gap-4 text-[11px] text-ink-3">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-[3px]" style={{ backgroundColor: chart.series1 }} />
+              Primary
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-[3px]" style={{ backgroundColor: chart.series1Soft }} />
+              Secondary ×½
+            </span>
+          </div>
+        )}
         <ResponsiveContainer width="100%" height={Math.max(180, chartData.length * 34)}>
           <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 34, left: 0, bottom: 0 }} barCategoryGap="30%">
             <CartesianGrid stroke={chart.grid} strokeWidth={1} horizontal={false} />
             <XAxis type="number" tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} />
             <YAxis dataKey="name" type="category" tick={axisTick} axisLine={false} tickLine={false} width={86} />
             <Tooltip content={<VolumeTooltip unit={unit} />} cursor={{ fill: chart.grid, fillOpacity: 0.35 }} />
-            <Bar dataKey="sets" fill={chart.series1} radius={[0, 4, 4, 0]} maxBarSize={16}>
+            <Bar dataKey="primary" stackId="v" fill={chart.series1} stroke={chart.surface} strokeWidth={1} maxBarSize={16} />
+            {/* minPointSize keeps a hairline closing segment on zero-secondary
+                rows so every row's merged total gets its direct label. */}
+            <Bar dataKey="secondaryCredit" stackId="v" fill={chart.series1Soft} stroke={chart.surface} strokeWidth={1} radius={[0, 4, 4, 0]} maxBarSize={16} minPointSize={2}>
               <LabelList dataKey="sets" position="right" style={{ fontSize: 11, fill: chart.axisText }} />
             </Bar>
           </BarChart>
@@ -49,10 +80,13 @@ function VolumePanel({ volume, unit }) {
           <div key={bp.body_part}>
             <button
               onClick={() => setExpanded(expanded === bp.body_part ? null : bp.body_part)}
-              className="flex min-h-12 w-full items-center justify-between px-4 py-3 transition-colors active:bg-sunken">
+              className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 transition-colors active:bg-sunken">
               <span className="text-sm font-medium capitalize text-ink">{bp.body_part}</span>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-ink-2 tabular-nums">{Math.round(bp.total_sets * 10) / 10} sets</span>
+                <div className="text-right">
+                  <div className="text-sm text-ink-2 tabular-nums">{round1(bp.total_sets)} sets</div>
+                  <div className="text-[11px] text-ink-3 tabular-nums">{splitLine(bp.primary_sets, bp.secondary_sets)}</div>
+                </div>
                 <svg className={`h-4 w-4 text-ink-4 transition-transform ${expanded === bp.body_part ? 'rotate-90' : ''}`}
                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -61,11 +95,14 @@ function VolumePanel({ volume, unit }) {
             </button>
 
             {expanded === bp.body_part && bp.sub_muscles && (
-              <div className="space-y-1 px-4 pb-3">
+              <div className="space-y-1.5 px-4 pb-3">
                 {bp.sub_muscles.map(m => (
-                  <div key={m.muscle_id} className="flex justify-between py-0.5">
-                    <span className="text-sm text-ink-3">{m.muscle_name}</span>
-                    <span className="text-sm text-ink-2 tabular-nums">{Math.round(m.sets * 10) / 10}</span>
+                  <div key={m.muscle_id} className="flex items-baseline justify-between gap-3 py-0.5">
+                    <span className="min-w-0 truncate text-sm text-ink-3">{m.muscle_name}</span>
+                    <div className="shrink-0 text-right">
+                      <span className="text-sm text-ink-2 tabular-nums">{round1(m.sets)}</span>
+                      <span className="ml-2 text-[11px] text-ink-3 tabular-nums">{splitLine(m.primary_sets, m.secondary_sets)}</span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -112,7 +149,11 @@ export default function Volume() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Block volume" subtitle="Working sets per muscle group" backTo="/programs/history" />
+      <PageHeader
+        title="Block volume"
+        subtitle="Working sets per muscle group · secondary work counts ½"
+        backTo="/programs/history"
+      />
 
       {/* Planned: pure program math (target sets × muscle map), no logging
           required — this is the planning view */}

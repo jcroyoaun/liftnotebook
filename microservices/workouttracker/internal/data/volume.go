@@ -9,16 +9,26 @@ import (
 )
 
 type MuscleVolume struct {
-	MuscleID   int64   `json:"muscle_id"`
-	MuscleName string  `json:"muscle_name"`
-	BodyPart   string  `json:"body_part"`
-	Sets       float64 `json:"sets"` // primary=1, secondary=0.5
+	MuscleID      int64   `json:"muscle_id"`
+	MuscleName    string  `json:"muscle_name"`
+	BodyPart      string  `json:"body_part"`
+	PrimarySets   float64 `json:"primary_sets"`   // raw sets where this muscle is primary
+	SecondarySets float64 `json:"secondary_sets"` // raw sets where this muscle is secondary
+	Sets          float64 `json:"sets"`           // merged: primary + 0.5*secondary
 }
 
 type BodyPartVolume struct {
-	BodyPart   string         `json:"body_part"`
-	TotalSets  float64        `json:"total_sets"`
-	SubMuscles []MuscleVolume `json:"sub_muscles"`
+	BodyPart      string         `json:"body_part"`
+	PrimarySets   float64        `json:"primary_sets"`
+	SecondarySets float64        `json:"secondary_sets"`
+	TotalSets     float64        `json:"total_sets"` // merged: primary + 0.5*secondary
+	SubMuscles    []MuscleVolume `json:"sub_muscles"`
+}
+
+// bpSplit accumulates a body part's raw primary/secondary set counts.
+type bpSplit struct {
+	primary   float64
+	secondary float64
 }
 
 type VolumeModel struct {
@@ -68,21 +78,18 @@ func (m VolumeModel) GetMesocycleVolume(userID, mesocycleID int64) ([]BodyPartVo
 			return nil, err
 		}
 
-		multiplier := 1.0
-		if targetType == "secondary" {
-			multiplier = 0.5
-		}
-
-		if mv, ok := muscleMap[muscleID]; ok {
-			mv.Sets += float64(setCount) * multiplier
-		} else {
+		mv, ok := muscleMap[muscleID]
+		if !ok {
 			muscleOrder = append(muscleOrder, muscleID)
-			muscleMap[muscleID] = &MuscleVolume{
-				MuscleID:   muscleID,
-				MuscleName: name,
-				BodyPart:   bodyPart,
-				Sets:       float64(setCount) * multiplier,
-			}
+			mv = &MuscleVolume{MuscleID: muscleID, MuscleName: name, BodyPart: bodyPart}
+			muscleMap[muscleID] = mv
+		}
+		if targetType == "secondary" {
+			mv.SecondarySets += float64(setCount)
+			mv.Sets += float64(setCount) * 0.5
+		} else {
+			mv.PrimarySets += float64(setCount)
+			mv.Sets += float64(setCount)
 		}
 
 		key := exBP{exerciseID, bodyPart}
@@ -97,13 +104,18 @@ func (m VolumeModel) GetMesocycleVolume(userID, mesocycleID int64) ([]BodyPartVo
 		return nil, err
 	}
 
-	bodyPartSets := make(map[string]float64)
+	bodyPartSets := make(map[string]*bpSplit)
 	for key, tt := range bestType {
-		multiplier := 1.0
-		if tt == "secondary" {
-			multiplier = 0.5
+		split := bodyPartSets[key.bodyPart]
+		if split == nil {
+			split = &bpSplit{}
+			bodyPartSets[key.bodyPart] = split
 		}
-		bodyPartSets[key.bodyPart] += float64(exSets[key]) * multiplier
+		if tt == "secondary" {
+			split.secondary += float64(exSets[key])
+		} else {
+			split.primary += float64(exSets[key])
+		}
 	}
 
 	return groupByBodyPart(muscleMap, muscleOrder, bodyPartSets), nil
@@ -165,23 +177,20 @@ func (m VolumeModel) PreviewVolume(exercises []ExerciseSetsInput) ([]BodyPartVol
 			return nil, err
 		}
 
-		multiplier := 1.0
-		if targetType == "secondary" {
-			multiplier = 0.5
-		}
+		sets := float64(setsMap[exerciseID])
 
-		sets := float64(setsMap[exerciseID]) * multiplier
-
-		if mv, ok := muscleMap[muscleID]; ok {
-			mv.Sets += sets
-		} else {
+		mv, ok := muscleMap[muscleID]
+		if !ok {
 			muscleOrder = append(muscleOrder, muscleID)
-			muscleMap[muscleID] = &MuscleVolume{
-				MuscleID:   muscleID,
-				MuscleName: name,
-				BodyPart:   bodyPart,
-				Sets:       sets,
-			}
+			mv = &MuscleVolume{MuscleID: muscleID, MuscleName: name, BodyPart: bodyPart}
+			muscleMap[muscleID] = mv
+		}
+		if targetType == "secondary" {
+			mv.SecondarySets += sets
+			mv.Sets += sets * 0.5
+		} else {
+			mv.PrimarySets += sets
+			mv.Sets += sets
 		}
 
 		key := exBP{exerciseID, bodyPart}
@@ -193,19 +202,24 @@ func (m VolumeModel) PreviewVolume(exercises []ExerciseSetsInput) ([]BodyPartVol
 		return nil, err
 	}
 
-	bodyPartSets := make(map[string]float64)
+	bodyPartSets := make(map[string]*bpSplit)
 	for key, tt := range bestType {
-		multiplier := 1.0
-		if tt == "secondary" {
-			multiplier = 0.5
+		split := bodyPartSets[key.bodyPart]
+		if split == nil {
+			split = &bpSplit{}
+			bodyPartSets[key.bodyPart] = split
 		}
-		bodyPartSets[key.bodyPart] += float64(setsMap[key.exerciseID]) * multiplier
+		if tt == "secondary" {
+			split.secondary += float64(setsMap[key.exerciseID])
+		} else {
+			split.primary += float64(setsMap[key.exerciseID])
+		}
 	}
 
 	return groupByBodyPart(muscleMap, muscleOrder, bodyPartSets), nil
 }
 
-func groupByBodyPart(muscleMap map[int64]*MuscleVolume, muscleOrder []int64, bodyPartSets map[string]float64) []BodyPartVolume {
+func groupByBodyPart(muscleMap map[int64]*MuscleVolume, muscleOrder []int64, bodyPartSets map[string]*bpSplit) []BodyPartVolume {
 	bodyPartMap := make(map[string]*BodyPartVolume)
 	var bpOrder []string
 
@@ -223,7 +237,11 @@ func groupByBodyPart(muscleMap map[int64]*MuscleVolume, muscleOrder []int64, bod
 	var result []BodyPartVolume
 	for _, bpName := range bpOrder {
 		bpv := bodyPartMap[bpName]
-		bpv.TotalSets = bodyPartSets[bpName]
+		if split := bodyPartSets[bpName]; split != nil {
+			bpv.PrimarySets = split.primary
+			bpv.SecondarySets = split.secondary
+			bpv.TotalSets = split.primary + split.secondary*0.5
+		}
 		result = append(result, *bpv)
 	}
 	return result

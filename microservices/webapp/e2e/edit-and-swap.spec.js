@@ -81,6 +81,7 @@ test.describe.serial('Swap, edit past workout, and notes', () => {
     await sheet.locator('input[placeholder*="replacement"]').fill('Machine Row')
     await sheet.locator('button:has-text("Machine Row")').click()
     await sheet.locator('button:has-text("Just this workout")').click()
+    await expect(page.getByRole('dialog')).toBeHidden()
 
     // The replacement card takes the slot; provenance is labelled.
     const card = page.locator('[class*="rounded-card"]').filter({ hasText: 'Machine Row' })
@@ -110,14 +111,20 @@ test.describe.serial('Swap, edit past workout, and notes', () => {
     await sheet.locator('input[placeholder*="replacement"]').fill('Barbell Back Squat')
     await sheet.locator('button:has-text("Barbell Back Squat")').click()
     await sheet.locator('button:has-text("For the rest of the block")').click()
+    // The sheet closes only after the PUT resolves — wait for it, then poll
+    // the API so a slow write can't race the assertion.
+    await expect(page.getByRole('dialog')).toBeHidden()
 
-    await expect(page.locator('text=Barbell Back Squat')).toBeVisible()
+    await expect(page.locator('text=Barbell Back Squat').first()).toBeVisible()
 
     // The day template now carries the squat in the bench's slot.
-    const meso = await api(`/mesocycles/${mesoId}`)
-    const exercises = meso.days[0].exercises.map((e) => e.exercise_id)
-    expect(exercises).toContain(1)
-    expect(exercises).not.toContain(11)
+    await expect
+      .poll(async () => {
+        const meso = await api(`/mesocycles/${mesoId}`)
+        const ids = meso.days[0].exercises.map((e) => e.exercise_id)
+        return ids.includes(1) && !ids.includes(11)
+      }, { timeout: 10000 })
+      .toBe(true)
   })
 
   test('edit a past workout through the escape hatch', async ({ page }) => {
@@ -149,10 +156,14 @@ test.describe.serial('Swap, edit past workout, and notes', () => {
     await page.getByRole('dialog').locator('textarea').fill('Machine was taken — swapped rows in.')
     await page.click('button:has-text("Save notes")')
 
+    // The sheet closes only after the PATCH resolves; assert on the card, not
+    // the (value-holding) textarea, then poll the API past any commit race.
+    await expect(page.getByRole('dialog')).toBeHidden()
     await expect(page.locator('text=Machine was taken — swapped rows in.')).toBeVisible()
 
-    const data = await api(`/sessions/${sessionId}`)
-    expect(data.session.notes).toBe('Machine was taken — swapped rows in.')
+    await expect
+      .poll(async () => (await api(`/sessions/${sessionId}`)).session.notes, { timeout: 10000 })
+      .toBe('Machine was taken — swapped rows in.')
   })
 
   test('rest alarm endpoints schedule and cancel', async () => {

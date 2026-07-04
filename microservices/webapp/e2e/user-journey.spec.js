@@ -288,6 +288,20 @@ test.describe.serial('Full User Journey', () => {
     expect(vol['glutes']).toBeGreaterThanOrEqual(3)
   })
 
+  // 7b. VOLUME PAGE — primary/secondary split + per-muscle drill-down
+  test('7b. Volume page splits primary vs secondary with muscle drill-down', async ({ page }) => {
+    await loginAndGo(page, `/programs/${mesoId}/volume`)
+
+    await expect(page.locator('text=secondary work counts ½')).toBeVisible()
+    // Bench work credits delts/triceps secondarily, so the legend renders.
+    await expect(page.locator('text=Secondary ×½').first()).toBeVisible({ timeout: 5000 })
+
+    // Drill into chest: per-muscle rundown with the primary/secondary line.
+    await page.locator('button', { hasText: 'chest' }).first().click()
+    await expect(page.locator('text=Pectoralis Major').first()).toBeVisible()
+    await expect(page.locator('text=/\\d+(\\.\\d+)? primary/').first()).toBeVisible()
+  })
+
   // 8. WEEK 2 - progression
   test('8a. Week 2 Push workout (heavier)', async ({ page }) => {
     await loginAndGo(page, '/')

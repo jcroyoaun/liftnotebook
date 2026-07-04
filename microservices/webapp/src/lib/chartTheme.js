@@ -7,6 +7,9 @@ import { useTheme } from './themeContext'
 
 const light = {
   series1: '#2563eb', // cobalt — primary series / sequential hue
+  series1Soft: '#7aa2ec', // lighter cobalt step — part-to-whole companion of
+  // series1 (secondary-muscle ½ credit). Validator: PASS band/chroma/CVD
+  // (ΔE 35.9 protan); contrast WARN relieved by direct labels + table rows.
   series2: '#12996a', // green — second series only
   good: '#0f7a3d',
   grid: '#e4e8ee', // hairline, solid, recessive (cool slate neutral)
@@ -17,6 +20,7 @@ const light = {
 
 const dark = {
   series1: '#4a80f2', // same hues, stepped for the dark surface — not a flip
+  series1Soft: '#3a67bd', // validated dark step: all checks pass incl. contrast
   series2: '#199e70',
   good: '#3fbf74',
   grid: '#242e3d',
