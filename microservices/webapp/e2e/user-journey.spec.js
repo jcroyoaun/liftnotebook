@@ -296,6 +296,10 @@ test.describe.serial('Full User Journey', () => {
     // Bench work credits delts/triceps secondarily, so the legend renders.
     await expect(page.locator('text=Secondary ×½').first()).toBeVisible({ timeout: 5000 })
 
+    // The body-diagram heat view rides above the bars.
+    await expect(page.getByRole('img', { name: 'Front muscles' }).first()).toBeVisible()
+    await expect(page.locator('text=fewer sets').first()).toBeVisible()
+
     // Drill into chest: per-muscle rundown with the primary/secondary line.
     await page.locator('button', { hasText: 'chest' }).first().click()
     await expect(page.locator('text=Pectoralis Major').first()).toBeVisible()

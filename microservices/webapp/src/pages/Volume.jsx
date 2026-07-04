@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts'
 import { api } from '../api/client'
 import { useChartTheme } from '../lib/chartTheme'
+import MuscleMap from '../components/MuscleMap'
 import PageHeader from '../components/ui/PageHeader'
 import { Skeleton } from '../components/ui/Skeleton'
 
@@ -47,6 +48,10 @@ function VolumePanel({ volume, unit }) {
   return (
     <>
       <div className="rounded-card border border-line bg-card p-4 shadow-card">
+        <MuscleMap
+          heat={volume.flatMap(bp => (bp.sub_muscles || []).map(m => ({ muscle_name: m.muscle_name, sets: m.sets })))}
+        />
+        <div className="mb-2 mt-4" />
         {hasSecondary && (
           <div className="mb-2 flex items-center gap-4 text-[11px] text-ink-3">
             <span className="flex items-center gap-1.5">
