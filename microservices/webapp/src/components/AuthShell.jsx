@@ -19,11 +19,8 @@ export default function AuthShell({ children }) {
             Lift<span className="text-grad">Notebook</span>
           </h1>
         </Link>
-        <p className="mb-8 text-center text-sm text-ink-3">Your training, written down</p>
+        <p className="mb-8 text-center text-sm text-ink-3">Your free workout tracker</p>
         {children}
-        <p className="mt-7 text-center text-[12px] font-medium uppercase tracking-[0.16em] text-ink-3">
-          Two sets &middot; To failure &middot; Written down
-        </p>
       </div>
     </div>
   )
