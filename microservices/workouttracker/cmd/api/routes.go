@@ -62,6 +62,7 @@ func (app *application) routes() http.Handler {
 	// Admin
 	router.HandlerFunc(http.MethodGet, "/v1/admin/users", app.requireAdmin(app.listUsersHandler))
 	router.HandlerFunc(http.MethodPost, "/v1/admin/users/:id/reset-token", app.requireAdmin(app.createPasswordResetTokenHandler))
+	router.HandlerFunc(http.MethodGet, "/v1/admin/invite-code", app.requireAdmin(app.getInviteCodeHandler))
 
 	// Analytics
 	router.HandlerFunc(http.MethodPost, "/v1/volume/preview", app.requireAuth(app.previewVolumeHandler))

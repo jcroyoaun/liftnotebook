@@ -10,6 +10,7 @@ import { useToast } from '../lib/toastContext'
 // design — the admin hands the code to the member out-of-band.
 export default function AdminUsers() {
   const [users, setUsers] = useState([])
+  const [inviteCode, setInviteCode] = useState(null)
   const [loading, setLoading] = useState(true)
   const [resetFor, setResetFor] = useState(null)
   const [resetToken, setResetToken] = useState(null)
@@ -21,7 +22,22 @@ export default function AdminUsers() {
       .then(data => setUsers(data.users || []))
       .catch(err => toast(err.message))
       .finally(() => setLoading(false))
+    api.getInviteCode()
+      .then(data => setInviteCode(data.invite_code ?? ''))
+      .catch(() => setInviteCode(null))
   }, [toast])
+
+  async function copyInviteLink() {
+    const link = inviteCode
+      ? `${window.location.origin}/register?code=${encodeURIComponent(inviteCode)}`
+      : `${window.location.origin}/register`
+    try {
+      await navigator.clipboard.writeText(link)
+      toast('Invite link copied', 'success')
+    } catch {
+      toast('Could not copy — grab it from Settings instead')
+    }
+  }
 
   async function generate(user) {
     setResetFor(user)
@@ -59,6 +75,20 @@ export default function AdminUsers() {
   return (
     <div className="space-y-4">
       <PageHeader title="Members" subtitle="Everyone training here" backTo="/settings" />
+
+      {inviteCode !== null && (
+        <div className="flex items-center justify-between gap-3 rounded-card border border-line bg-card p-4 shadow-card">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-ink">Invite a friend</div>
+            <div className="text-[13px] text-ink-3">
+              One link — invite code comes prefilled, they just pick a password.
+            </div>
+          </div>
+          <Button variant="secondary" onClick={copyInviteLink} className="shrink-0">
+            Copy link
+          </Button>
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-card border border-line bg-card shadow-card">
         <ul className="divide-y divide-line">

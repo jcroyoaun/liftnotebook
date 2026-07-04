@@ -33,8 +33,8 @@ export default function Login() {
       <form onSubmit={handleSubmit} className="space-y-4 rounded-card border border-line bg-card p-6 shadow-card">
         <h2 className="font-display text-lg font-semibold text-ink">Sign In</h2>
         {error && <div className="rounded-lg bg-danger-wash p-2.5 text-sm text-danger">{error}</div>}
-        <Input label="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
-        <Input label="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+        <Input label="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required />
+        <Input label="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" required />
         <Button type="submit" disabled={loading} className="w-full min-h-12">
           {loading ? 'Signing in...' : 'Sign In'}
         </Button>

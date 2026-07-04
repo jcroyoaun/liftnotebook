@@ -61,6 +61,7 @@ export const api = {
   // Admin
   getAdminUsers: () => request('/admin/users'),
   createResetToken: (userId) => request(`/admin/users/${userId}/reset-token`, { method: 'POST' }),
+  getInviteCode: () => request('/admin/invite-code'),
 
   // Exercises
   getExercises: () => request('/exercises'),

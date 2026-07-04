@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMutationState } from '@tanstack/react-query'
+import { api } from '../../api/client'
 import { useSessionBundle, useSyncSet, useDeleteSet } from './hooks'
 import ExerciseLogCard from './ExerciseLogCard'
 import RestTimer from './RestTimer'
@@ -16,6 +17,32 @@ const ACTIVE_SESSION_KEY = 'activeSession'
 
 function minutesSince(iso) {
   return Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
+}
+
+// Best-effort PR check: for each exercise trained, compare this session's
+// best e1RM point against the best of every earlier session. Server history
+// already includes the just-synced sets; offline it simply resolves to [].
+async function detectPRs(sessionId, exerciseIds, exerciseNames) {
+  const checks = exerciseIds.map(async (exerciseId) => {
+    const data = await api.getE1RMProgress(exerciseId)
+    const points = data.progress || []
+    const current = points.find((p) => p.session_id === sessionId)
+    if (!current) return null
+    const priorBest = points
+      .filter((p) => p.session_id !== sessionId)
+      .reduce((best, p) => Math.max(best, p.avg_e1rm), 0)
+    if (priorBest <= 0 || current.avg_e1rm <= priorBest) return null
+    return {
+      exercise_id: exerciseId,
+      exercise_name: exerciseNames.get(exerciseId),
+      e1rm: current.avg_e1rm,
+      previous: priorBest,
+    }
+  })
+  const results = await Promise.allSettled(checks)
+  return results
+    .filter((r) => r.status === 'fulfilled' && r.value)
+    .map((r) => r.value)
 }
 
 function subscribeOnline(cb) {
@@ -90,13 +117,23 @@ export default function WorkoutSession() {
     const startedAt = session.data?.session?.performed_at
     const minutes = startedAt ? minutesSince(startedAt) : null
     navigator.vibrate?.(60)
+    const exerciseIds = [...new Set(recorded.map((s) => s.exercise_id))]
     setSummary({
       sets: recorded.length,
-      exercises: new Set(recorded.map((s) => s.exercise_id)).size,
+      exercises: exerciseIds.length,
       volume,
       minutes,
       best: best?.set || null,
+      prs: null, // null = still checking; [] = checked, none
     })
+
+    const exerciseNames = new Map(recorded.map((s) => [s.exercise_id, s.exercise_name]))
+    detectPRs(Number(sessionId), exerciseIds, exerciseNames)
+      .then((prs) => {
+        if (prs.length > 0) navigator.vibrate?.([40, 60, 40])
+        setSummary((prev) => (prev ? { ...prev, prs } : prev))
+      })
+      .catch(() => setSummary((prev) => (prev ? { ...prev, prs: [] } : prev)))
   }
 
   function closeOut() {
@@ -235,6 +272,23 @@ export default function WorkoutSession() {
                 ? <StatTile label="minutes" value={summary.minutes} />
                 : <StatTile label="exercises" value={summary.exercises} />}
             </div>
+            {summary.prs?.length > 0 && (
+              <div className="space-y-1.5">
+                {summary.prs.map((pr) => (
+                  <div key={pr.exercise_id} className="flex items-center gap-2.5 rounded-field bg-ok-wash px-3 py-2.5 animate-stamp">
+                    <span aria-hidden="true">🏆</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-ok">
+                        New best: {pr.exercise_name}
+                      </div>
+                      <div className="text-[12px] text-ink-3 tabular-nums">
+                        {Math.round(pr.e1rm * 10) / 10} kg e1RM · was {Math.round(pr.previous * 10) / 10}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             {summary.best && (
               <div className="flex items-center justify-between rounded-field bg-sunken px-3 py-2.5">
                 <span className="text-[13px] font-medium text-ink-2">Top set</span>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { setSession } from '../auth/session'
 import AuthShell from '../components/AuthShell'
@@ -7,10 +7,13 @@ import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 
 export default function Register() {
+  // Invite links (/register?code=...) prefill the code so friends only type
+  // name, email, password.
+  const [searchParams] = useSearchParams()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [inviteCode, setInviteCode] = useState('')
+  const [inviteCode, setInviteCode] = useState(searchParams.get('code') || '')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -35,9 +38,9 @@ export default function Register() {
       <form onSubmit={handleSubmit} className="space-y-4 rounded-card border border-line bg-card p-6 shadow-card">
         <h2 className="font-display text-lg font-semibold text-ink">Create Account</h2>
         {error && <div className="rounded-lg bg-danger-wash p-2.5 text-sm text-danger">{error}</div>}
-        <Input label="Name" type="text" value={name} onChange={e => setName(e.target.value)} required />
-        <Input label="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
-        <Input label="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} />
+        <Input label="Name" type="text" value={name} onChange={e => setName(e.target.value)} autoComplete="name" required />
+        <Input label="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required />
+        <Input label="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" required minLength={8} />
         <Input
           label="Invite Code"
           type="text"

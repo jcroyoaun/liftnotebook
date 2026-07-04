@@ -157,6 +157,16 @@ export default function Dashboard() {
   const sessionsThisWeek = sessions.filter(s => new Date(s.performed_at) >= weekStart).length
   const setsThisWeek = Math.round(actualVolume.reduce((sum, bp) => sum + bp.total_sets, 0))
 
+  // Consistency streak: consecutive Monday-weeks with at least one workout,
+  // counting back from this week. A quiet current week doesn't break the
+  // streak until it's over — last week's streak carries through.
+  const WEEK_MS = 7 * 86400_000
+  const weeksWithSessions = new Set(
+    sessions.map(s => Math.floor((new Date(s.performed_at).getTime() - weekStart.getTime()) / WEEK_MS))
+  ) // 0 = this week, -1 = last week, ...
+  let streakWeeks = 0
+  for (let w = weeksWithSessions.has(0) ? 0 : -1; weeksWithSessions.has(w); w--) streakWeeks++
+
   // Suggested next day: the one after the most recently logged session
   // (cyclic). Days always render in program order — this only places a badge
   // and expands one card; completing a day never reorders the list.
@@ -223,7 +233,11 @@ export default function Dashboard() {
       <div className="grid grid-cols-3 gap-2.5">
         <StatTile label="workouts" value={`${sessionsThisWeek}/${meso.days_per_week}`} sub="this week" />
         <StatTile label="sets" value={setsThisWeek} sub="this week" />
-        <StatTile label="block week" value={weekNumber} />
+        <StatTile
+          label="week streak"
+          value={streakWeeks}
+          sub={streakWeeks >= 2 ? 'keep it rolling' : 'in a row'}
+        />
       </div>
 
       {/* The split, always in program order — completing a day never
