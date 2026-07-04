@@ -135,9 +135,15 @@ are just different per-exercise target values.
 
 ### Next up
 
-- Owner still owes the house template programs (exercise lists per day) to
-  seed the template catalog via Coach's corner.
+- Email self-service password reset via Resend (owner creates the account +
+  API key; token machinery already exists — only delivery is new; falls back
+  to admin codes when unconfigured). Also solves the admin-lockout case.
+- MCP server for voice logging: mount streamable-HTTP MCP at /mcp inside
+  workouttracker (start_workout/log_set/next_exercise/finish_workout tools,
+  JWT auth) — phone clients with remote-connector support attach to it.
 - Chart kit, app icon/splash refresh, exercise detail page (P3).
+- ✅ Templates seeded: #1 Upper/Lower Maximalist — Injury Edition (owner),
+  #2 Upper/Lower Maximalist (regular).
 - Optional add-on: chart kit — src/components/charts/ (shared ChartTooltip +
   TrendChart/HBarChart wrappers baking in theme/grid/axis defaults). The
   chartTheme.js token layer is solid; the gap is hand-rolled Recharts markup
