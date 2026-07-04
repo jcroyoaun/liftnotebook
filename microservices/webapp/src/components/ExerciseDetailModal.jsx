@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import BottomSheet from './ui/BottomSheet'
 import MuscleMap from './MuscleMap'
 import ExerciseArt from './ExerciseArt'
+import { exercisePhotoUrls } from '../lib/exercisePhotos'
 import { Skeleton } from './ui/Skeleton'
 
 function sectionTargets(targets, targetType) {
@@ -84,9 +85,31 @@ export default function ExerciseDetailModal({ exerciseId, onClose }) {
 
         {!loading && !error && (
           <>
-            <div className="mx-auto max-w-40 rounded-field bg-sunken/60 p-2">
-              <ExerciseArt exerciseId={exerciseId} className="h-auto w-full" />
-            </div>
+            {(() => {
+              const photos = exercisePhotoUrls(exerciseId)
+              if (photos) {
+                // Real start/end demonstration frames beat any drawing.
+                return (
+                  <div className="grid grid-cols-2 gap-2">
+                    {photos.map((src, i) => (
+                      <img
+                        key={src}
+                        src={src}
+                        alt={i === 0 ? 'Start position' : 'End position'}
+                        loading="lazy"
+                        data-testid="exercise-photo"
+                        className="w-full rounded-field border border-line"
+                      />
+                    ))}
+                  </div>
+                )
+              }
+              return (
+                <div className="mx-auto max-w-40 rounded-field bg-sunken/60 p-2">
+                  <ExerciseArt exerciseId={exerciseId} className="h-auto w-full" />
+                </div>
+              )
+            })()}
             <MuscleMap targets={exercise?.targets} />
             <TargetSection title="Primary Muscles" targets={primaryTargets} emptyLabel="No primary muscles configured." />
             <TargetSection title="Secondary Muscles" targets={secondaryTargets} emptyLabel="No secondary muscles configured." />
