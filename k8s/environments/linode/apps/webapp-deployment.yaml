@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: webapp
-          image: ghcr.io/jcroyoaun/liftnotebook-webapp:sha-03dd96473aeb
+          image: ghcr.io/jcroyoaun/liftnotebook-webapp:sha-1f48bce8b2d0
           imagePullPolicy: Always
           ports:
             - name: http
