@@ -400,7 +400,11 @@ export default function Dashboard() {
                   </div>
                   {open && (
                     <>
-                      {day.exercises && day.exercises.length > 0 ? (
+                      {isDone && daySession ? (
+                        // Done days show the receipts, not the plan — what was
+                        // actually lifted, per set, right on the card.
+                        <DoneDayResults sessionId={daySession.id} />
+                      ) : day.exercises && day.exercises.length > 0 ? (
                         <div>
                           {day.exercises.map(ex => (
                             <ExerciseDetailButton
@@ -410,7 +414,7 @@ export default function Dashboard() {
                             >
                               <span className="text-[15px] font-medium text-ink">{ex.exercise_name}</span>
                               <span className="text-[13px] text-ink-3 tabular-nums">
-                                {ex.target_sets} sets
+                                {ex.target_sets} {ex.target_sets === 1 ? 'set' : 'sets'}
                               </span>
                             </ExerciseDetailButton>
                           ))}
@@ -555,6 +559,83 @@ export default function Dashboard() {
         onConfirm={deleteMeso}
         onClose={() => setConfirmAction(null)}
       />
+    </div>
+  )
+}
+
+// The results block inside a ✓ Done day card: every recorded set of that
+// day's workout, grouped per exercise in logged order, with the exercise's
+// note when one was left. The plan already happened — show what did.
+function DoneDayResults({ sessionId }) {
+  const [data, setData] = useState(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    api.getSession(sessionId)
+      .then((d) => { if (alive) setData(d) })
+      .catch(() => { if (alive) setFailed(true) })
+    return () => { alive = false }
+  }, [sessionId])
+
+  if (failed) return <p className="px-4 py-3 text-xs text-ink-3">Couldn't load this workout.</p>
+  if (!data) {
+    return (
+      <div className="space-y-2 px-4 py-3">
+        <div className="h-4 w-2/3 animate-pulse rounded bg-sunken" />
+        <div className="h-4 w-1/2 animate-pulse rounded bg-sunken" />
+      </div>
+    )
+  }
+
+  const fmtW = (v) => String(parseFloat(Number(v).toFixed(2)))
+  const fmtSet = (s) =>
+    s.weight_left != null && s.weight_right != null
+      ? `R${fmtW(s.weight_right)}/L${fmtW(s.weight_left)}×${s.reps}`
+      : `${fmtW(s.weight)}×${s.reps}`
+
+  const noteByExercise = new Map(
+    (data.exercise_notes || []).filter((n) => n.note).map((n) => [n.exercise_id, n.note])
+  )
+  const byExercise = new Map()
+  for (const s of data.sets || []) {
+    if (!s.recorded) continue
+    if (!byExercise.has(s.exercise_id)) {
+      byExercise.set(s.exercise_id, { exerciseId: s.exercise_id, name: s.exercise_name, sets: [], firstId: s.id ?? 0 })
+    }
+    const g = byExercise.get(s.exercise_id)
+    g.sets.push(s)
+    g.firstId = Math.min(g.firstId, s.id ?? g.firstId)
+  }
+  const groups = [...byExercise.values()].sort((a, b) => a.firstId - b.firstId)
+  for (const g of groups) g.sets.sort((a, b) => a.set_number - b.set_number)
+
+  if (groups.length === 0) {
+    return <p className="px-4 py-3 text-xs text-ink-3">Nothing recorded in this workout.</p>
+  }
+
+  return (
+    <div>
+      {groups.map((g) => (
+        <div key={g.exerciseId} className="border-b border-line px-4 py-3 last:border-b-0">
+          <div className="flex items-baseline justify-between gap-2">
+            <ExerciseDetailButton
+              exerciseId={g.exerciseId}
+              className="min-w-0 text-left text-[15px] font-medium text-ink transition-colors hover:text-accent"
+            >
+              {g.name}
+            </ExerciseDetailButton>
+            <span className="shrink-0 text-[13px] text-ink-2 tabular-nums">
+              {g.sets.map(fmtSet).join(' · ')} kg
+            </span>
+          </div>
+          {noteByExercise.has(g.exerciseId) && (
+            <p className="mt-1 text-[12px] leading-snug text-ink-3">
+              <span aria-hidden="true">📝</span> {noteByExercise.get(g.exerciseId)}
+            </p>
+          )}
+        </div>
+      ))}
     </div>
   )
 }

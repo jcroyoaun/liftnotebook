@@ -154,7 +154,10 @@ test.describe.serial('Swap, edit past workout, and notes', () => {
   test('add and edit session notes', async ({ page }) => {
     await seedPage(page, `/sessions/${sessionId}`)
 
-    await page.click('text=Add notes')
+    // exact:true — per-exercise 'Add note' buttons live on the same page, and
+    // the loose text engine can even match a card whose text runs
+    // 'Add note'+'Set 1' together.
+    await page.getByRole('button', { name: 'Add notes', exact: true }).click()
     await page.getByRole('dialog').locator('textarea').fill('Machine was taken — swapped rows in.')
     await page.click('button:has-text("Save notes")')
 

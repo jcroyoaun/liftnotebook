@@ -25,6 +25,11 @@ export default function SessionDetail() {
   const [notesOpen, setNotesOpen] = useState(false)
   const [notesDraft, setNotesDraft] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
+  // Per-exercise note editing straight from the record — "which machine was
+  // that" gets remembered on the exercise it belongs to, even after the fact.
+  const [exNoteFor, setExNoteFor] = useState(null) // { exerciseId, name }
+  const [exNoteDraft, setExNoteDraft] = useState('')
+  const [savingExNote, setSavingExNote] = useState(false)
   const toast = useToast()
   const activeSession = getActiveSession()
   const isActive = activeSession && String(activeSession.id) === String(id)
@@ -34,6 +39,27 @@ export default function SessionDetail() {
       .then(setData)
       .catch(() => setError(true))
   }, [id])
+
+  async function saveExerciseNote() {
+    setSavingExNote(true)
+    try {
+      const note = exNoteDraft.trim()
+      await api.upsertExerciseNote(id, exNoteFor.exerciseId, { note })
+      setData((prev) => {
+        const others = (prev.exercise_notes || []).filter((n) => n.exercise_id !== exNoteFor.exerciseId)
+        return {
+          ...prev,
+          exercise_notes: note ? [...others, { exercise_id: exNoteFor.exerciseId, note }] : others,
+        }
+      })
+      setExNoteFor(null)
+      toast('Note saved', 'success')
+    } catch (err) {
+      toast(err.message)
+    } finally {
+      setSavingExNote(false)
+    }
+  }
 
   async function saveNotes() {
     setSavingNotes(true)
@@ -125,11 +151,29 @@ export default function SessionDetail() {
         exercises.map((ex) => (
           <div key={ex.exerciseId} className="overflow-hidden rounded-card border border-line bg-card shadow-card">
             <div className="border-b border-line px-4 py-3">
-              <h3 className="text-[15px] font-semibold text-ink">{ex.name}</h3>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="min-w-0 text-[15px] font-semibold text-ink">{ex.name}</h3>
+                <button
+                  onClick={() => {
+                    setExNoteDraft(noteByExercise.get(ex.exerciseId) || '')
+                    setExNoteFor({ exerciseId: ex.exerciseId, name: ex.name })
+                  }}
+                  aria-label={`note ${ex.name}`}
+                  className="shrink-0 py-1 text-[13px] font-medium text-accent"
+                >
+                  {noteByExercise.has(ex.exerciseId) ? 'Edit note' : 'Add note'}
+                </button>
+              </div>
               {noteByExercise.has(ex.exerciseId) && (
-                <p className="mt-1.5 inline-block max-w-full rounded-field bg-wash px-2 py-1 text-sm text-ink-3">
+                <button
+                  onClick={() => {
+                    setExNoteDraft(noteByExercise.get(ex.exerciseId) || '')
+                    setExNoteFor({ exerciseId: ex.exerciseId, name: ex.name })
+                  }}
+                  className="mt-1.5 inline-block max-w-full rounded-field bg-wash px-2 py-1 text-left text-sm text-ink-3 active:bg-sunken"
+                >
                   📝 {noteByExercise.get(ex.exerciseId)}
-                </p>
+                </button>
               )}
             </div>
             <div className="divide-y divide-line">
@@ -189,6 +233,28 @@ export default function SessionDetail() {
             {savingNotes ? 'Saving…' : 'Save notes'}
           </Button>
         </div>
+      </BottomSheet>
+
+      <BottomSheet open={!!exNoteFor} onClose={() => setExNoteFor(null)} title="Exercise note">
+        {exNoteFor && (
+          <div className="space-y-4">
+            <p className="text-[13px] text-ink-3">
+              {exNoteFor.name} — machine, seat, grip. Future you will want to know.
+            </p>
+            <textarea
+              value={exNoteDraft}
+              onChange={(e) => setExNoteDraft(e.target.value)}
+              rows={4}
+              maxLength={2000}
+              autoFocus
+              placeholder="Panatta taken — used the Lifefitness, seat 4."
+              className="w-full rounded-field border border-line-2 bg-raised px-3 py-2.5 text-[15px] text-ink placeholder:text-ink-4 transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
+            />
+            <Button onClick={saveExerciseNote} disabled={savingExNote} className="w-full min-h-12">
+              {savingExNote ? 'Saving…' : 'Save note'}
+            </Button>
+          </div>
+        )}
       </BottomSheet>
     </div>
   )

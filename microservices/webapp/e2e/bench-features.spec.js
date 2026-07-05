@@ -153,4 +153,31 @@ test.describe.serial('Unilateral sets, exercise notes, history', () => {
     // Clean up: this throwaway session must not linger.
     await api(`/sessions/${sess2.session.id}`, { method: 'DELETE' })
   })
+
+  test('done day card shows inline results; record edits per-exercise notes', async ({ page }) => {
+    // The ✓ Done day card carries the receipts — per-set results and the
+    // exercise note, zero extra taps.
+    await seedPage(page, '/')
+    const dayToggle = page.locator('button[aria-label="toggle Day 1: Legs"]')
+    if ((await dayToggle.getAttribute('aria-expanded')) !== 'true') await dayToggle.click()
+    const dayCard = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 1: Legs' })
+    await expect(dayCard.locator('text=R60/L55×8')).toBeVisible()
+    await expect(dayCard.locator('text=Panatta taken')).toBeVisible()
+
+    // Per-exercise notes are editable straight from the workout record.
+    await seedPage(page, `/sessions/${sessionId}`)
+    await page.getByRole('button', { name: 'note Single Leg Leg Press' }).click()
+    const sheet = page.getByRole('dialog')
+    await sheet.locator('textarea').fill('Right 60 / Left 55 — Panatta taken. Seat 4.')
+    await sheet.locator('button:has-text("Save note")').click()
+    await expect(page.getByRole('dialog')).toBeHidden()
+    await expect(page.locator('text=Seat 4.')).toBeVisible()
+
+    await expect
+      .poll(async () => {
+        const data = await api(`/sessions/${sessionId}`)
+        return (data.exercise_notes || []).find((n) => n.exercise_id === 49)?.note || ''
+      }, { timeout: 10000 })
+      .toContain('Seat 4.')
+  })
 })
