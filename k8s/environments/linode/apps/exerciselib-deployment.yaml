@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: exerciselib
-          image: ghcr.io/jcroyoaun/exerciselib:sha-3ab404076fab
+          image: ghcr.io/jcroyoaun/exerciselib:sha-f7dbb40d8b0a
           imagePullPolicy: Always
           args:
             - -env=production
