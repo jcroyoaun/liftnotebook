@@ -147,13 +147,23 @@ export default function ExerciseLogCard({
           </div>
         )}
 
-        {note && (
+        {/* The note affordance must be readable text, not just the header
+            pencil — the owner stood in the gym unable to find it. */}
+        {note ? (
           <button
             type="button"
             onClick={() => onEditNote(exercise)}
             className="mt-1.5 block w-full rounded-field bg-wash px-2 py-1 text-left text-[12px] leading-snug text-ink-2 active:bg-sunken"
           >
             <span aria-hidden="true">📝</span> {note}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onEditNote(exercise)}
+            className="mt-1.5 block w-full px-1 py-1 text-left text-[12px] leading-snug text-ink-4 transition-colors active:text-accent"
+          >
+            <span aria-hidden="true">📝</span> Add note — machine, seat, grip…
           </button>
         )}
       </div>

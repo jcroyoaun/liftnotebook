@@ -114,9 +114,11 @@ export default function History() {
                       </span>
                     </div>
                     <div className="mt-1 flex items-baseline justify-between gap-3 text-[13px]">
+                      {/* Sets only — tonnage is deliberate non-information
+                          here (owner: the house method runs on sets to
+                          failure, kg totals are bloat). */}
                       <span className="shrink-0 text-ink-2 tabular-nums">
-                        {s.recorded_sets} {s.recorded_sets === 1 ? 'set' : 'sets'} ·{' '}
-                        {Math.round(s.total_volume_kg ?? 0).toLocaleString('en-US')} kg
+                        {s.recorded_sets} {s.recorded_sets === 1 ? 'set' : 'sets'}
                       </span>
                       <span className="min-w-0 truncate text-ink-4">
                         {exerciseSummary(s.exercises)}

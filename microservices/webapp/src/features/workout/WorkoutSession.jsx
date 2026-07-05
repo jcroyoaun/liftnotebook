@@ -20,15 +20,9 @@ import StatTile from '../../components/ui/StatTile'
 const TIMER_KEY = 'restTimerEndsAt'
 const ACTIVE_SESSION_KEY = 'activeSession'
 
-function minutesSince(iso) {
-  return Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
-}
-
-// Session tonnage: a unilateral pair moves (L + R) kg per rep.
-function setTonnage(s) {
-  const load = s.weight_left != null && s.weight_right != null ? s.weight_left + s.weight_right : s.weight || 0
-  return load * (s.reps || 0)
-}
+// No tonnage, no duration on the finish sheet — the house method runs on
+// sets to failure and beating last time's reps; the rest is bloat (owner's
+// words). PRs and the top set carry the celebration.
 
 // Best-effort PR check: for each exercise trained, compare this session's
 // best e1RM point against the best of every earlier session. Server history
@@ -408,14 +402,11 @@ export default function WorkoutSession() {
       closeOut()
       return
     }
-    const volume = Math.round(recorded.reduce((kg, s) => kg + setTonnage(s), 0))
     const best = recorded.reduce((b, s) => {
       const load = s.weight_left != null && s.weight_right != null ? Math.min(s.weight_left, s.weight_right) : s.weight || 0
       const e1rm = load * (1 + (s.reps || 0) / 30)
       return !b || e1rm > b.e1rm ? { set: s, e1rm } : b
     }, null)
-    const startedAt = session.data?.session?.performed_at
-    const minutes = startedAt ? minutesSince(startedAt) : null
     navigator.vibrate?.(60)
     const exerciseIds = [...new Set(recorded.map((s) => s.exercise_id))]
     const firstTimers = exerciseIds.filter((id) => {
@@ -425,8 +416,6 @@ export default function WorkoutSession() {
     setSummary({
       sets: recorded.length,
       exercises: exerciseIds.length,
-      volume,
-      minutes,
       best: best?.set || null,
       firstTimers,
       prs: null, // null = still checking; [] = checked, none
@@ -628,12 +617,9 @@ export default function WorkoutSession() {
                 <p className="text-[13px] text-ink-3">Another page in the notebook.</p>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <StatTile label="sets" value={summary.sets} sub="to failure" />
-              <StatTile label="volume" value={summary.volume.toLocaleString()} sub="kg lifted" />
-              {summary.minutes != null
-                ? <StatTile label={summary.minutes === 1 ? 'minute' : 'minutes'} value={summary.minutes} />
-                : <StatTile label={summary.exercises === 1 ? 'exercise' : 'exercises'} value={summary.exercises} />}
+              <StatTile label={summary.exercises === 1 ? 'exercise' : 'exercises'} value={summary.exercises} />
             </div>
             {summary.prs?.length > 0 && (
               <div className="space-y-1.5">
