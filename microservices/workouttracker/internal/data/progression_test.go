@@ -1,8 +1,81 @@
 package data
 
-import "testing"
+import (
+	"context"
+	"database/sql/driver"
+	"testing"
+	"time"
+)
 
 func intPtr(n int) *int { return &n }
+
+func TestGetLastSetsReturnsAllSetsOfMostRecentSession(t *testing.T) {
+	performedAt := time.Date(2026, 7, 1, 18, 0, 0, 0, time.UTC)
+
+	db, stub := newStubDB(t,
+		stubExpectation{
+			op: "query",
+			sqlContains: "AND wset.workout_session_id = ( SELECT ws2.workout_session_id FROM workout_sets ws2 " +
+				"JOIN workout_sessions sess2 ON ws2.workout_session_id = sess2.id " +
+				"WHERE sess2.user_id = $1 AND ws2.exercise_id = $2 AND ws2.recorded = true " +
+				"ORDER BY sess2.performed_at DESC, sess2.id DESC LIMIT 1 ) ORDER BY wset.set_number",
+			args: []driver.Value{int64(7), int64(3)},
+			rows: &stubRows{
+				columns: []string{"set_number", "weight", "weight_left", "weight_right", "reps", "rir", "performed_at"},
+				values: [][]driver.Value{
+					{int64(1), 40.0, 40.0, 42.5, int64(10), int64(0), performedAt},
+					{int64(2), 40.0, nil, nil, int64(8), int64(0), performedAt},
+				},
+			},
+		},
+	)
+
+	model := ProgressionModel{DB: db}
+
+	sets, lastPerformedAt, err := model.getLastSets(context.Background(), 7, 3)
+	if err != nil {
+		t.Fatalf("getLastSets: %v", err)
+	}
+	if len(sets) != 2 {
+		t.Fatalf("len = %d, want 2", len(sets))
+	}
+	if sets[0].SetNumber != 1 || sets[0].WeightLeft == nil || *sets[0].WeightRight != 42.5 {
+		t.Errorf("unexpected first set %+v", sets[0])
+	}
+	if sets[1].WeightLeft != nil || sets[1].WeightRight != nil {
+		t.Errorf("bilateral set must have nil per-limb weights, got %+v", sets[1])
+	}
+	if lastPerformedAt == nil || !lastPerformedAt.Equal(performedAt) {
+		t.Errorf("lastPerformedAt = %v, want %v", lastPerformedAt, performedAt)
+	}
+
+	stub.assertExhausted(t)
+}
+
+func TestGetLastSetsReturnsNilWhenNoHistory(t *testing.T) {
+	db, stub := newStubDB(t,
+		stubExpectation{
+			op:          "query",
+			sqlContains: "ORDER BY wset.set_number",
+			args:        []driver.Value{int64(7), int64(3)},
+			rows: &stubRows{
+				columns: []string{"set_number", "weight", "weight_left", "weight_right", "reps", "rir", "performed_at"},
+			},
+		},
+	)
+
+	model := ProgressionModel{DB: db}
+
+	sets, lastPerformedAt, err := model.getLastSets(context.Background(), 7, 3)
+	if err != nil {
+		t.Fatalf("getLastSets: %v", err)
+	}
+	if sets != nil || lastPerformedAt != nil {
+		t.Errorf("sets = %v, performedAt = %v; want nil/nil for no history", sets, lastPerformedAt)
+	}
+
+	stub.assertExhausted(t)
+}
 
 func TestSuggestNextSet(t *testing.T) {
 	// The house targets: 2 sets of 8-12 taken to failure.
@@ -30,7 +103,7 @@ func TestSuggestNextSet(t *testing.T) {
 			target:         target,
 			wantWeight:     0,
 			wantReps:       8,
-			wantReasonPart: "first exposure",
+			wantReasonPart: "first time here",
 		},
 		{
 			name:           "topped rep range at failure adds weight and resets reps",
@@ -78,7 +151,7 @@ func TestSuggestNextSet(t *testing.T) {
 			target:         target,
 			wantWeight:     100,
 			wantReps:       8,
-			wantReasonPart: "below the rep range",
+			wantReasonPart: "reps dipped",
 		},
 		{
 			name:           "nil RIR counts as intensity met",

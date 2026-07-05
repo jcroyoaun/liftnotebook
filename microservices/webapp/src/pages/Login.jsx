@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
-import { setSession } from '../auth/session'
+import { setSession, isTokenValid } from '../auth/session'
 import AuthShell from '../components/AuthShell'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
@@ -12,6 +12,11 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+
+  // Already signed in? Skip the form.
+  useEffect(() => {
+    if (isTokenValid()) navigate('/', { replace: true })
+  }, [navigate])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -38,12 +43,22 @@ export default function Login() {
         <Button type="submit" disabled={loading} className="w-full min-h-12">
           {loading ? 'Signing in...' : 'Sign In'}
         </Button>
-        <div className="space-y-1.5 text-center text-sm text-ink-3">
+        {/* Padded to ≥44px hit targets; negative margins keep the visual scale. */}
+        <div className="text-center text-sm text-ink-3">
           <p>
-            No account? <Link to="/register" className="font-medium text-accent hover:underline">Register</Link>
+            No account?{' '}
+            <Link
+              to="/register"
+              className="-mx-1.5 -my-1 inline-block px-1.5 py-3 font-medium text-accent hover:underline"
+            >
+              Register
+            </Link>
           </p>
           <p>
-            <Link to="/reset-password" className="underline-offset-2 hover:text-ink hover:underline">
+            <Link
+              to="/reset-password"
+              className="-mx-1.5 -my-1 inline-block px-1.5 py-3 underline-offset-2 hover:text-ink hover:underline"
+            >
               Forgot password?
             </Link>
           </p>

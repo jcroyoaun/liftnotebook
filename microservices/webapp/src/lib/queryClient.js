@@ -30,6 +30,13 @@ queryClient.setMutationDefaults(['syncSet'], {
   retry: 3,
 })
 
+// Per-exercise notes share the offline story: the PUT upserts on the natural
+// (session, exercise) key, so a replay from the restored queue is idempotent.
+queryClient.setMutationDefaults(['syncExerciseNote'], {
+  mutationFn: (vars) => api.upsertExerciseNote(vars.sessionId, vars.exerciseId, { note: vars.note }),
+  retry: 3,
+})
+
 // Persist the cache (including paused mutations) to IndexedDB so an offline
 // workout survives the app being killed at the gym.
 export const idbPersister = {

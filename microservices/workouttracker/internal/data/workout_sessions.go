@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 type WorkoutSession struct {
@@ -17,9 +19,9 @@ type WorkoutSession struct {
 	Notes         *string   `json:"notes"`
 	// RecordedSets distinguishes real workouts from abandoned empty sessions
 	// (Start Workout creates the row before any set is logged).
-	RecordedSets  int       `json:"recorded_sets"`
-	CreatedAt     time.Time `json:"-"`
-	Version       int32     `json:"version,omitzero"`
+	RecordedSets int       `json:"recorded_sets"`
+	CreatedAt    time.Time `json:"-"`
+	Version      int32     `json:"version,omitzero"`
 }
 
 type WorkoutSessionModel struct {
@@ -119,6 +121,72 @@ func (m WorkoutSessionModel) Update(session *WorkoutSession) error {
 		return err
 	}
 	return nil
+}
+
+// SessionSummary is one row of the cross-block workout history list:
+// enough to render "Upper A · Jun 12 · 8 sets · 2,340 kg · Bench, Squat"
+// without fetching each session.
+type SessionSummary struct {
+	ID            int64     `json:"id"`
+	PerformedAt   time.Time `json:"performed_at"`
+	DayLabel      string    `json:"day_label"`
+	MesocycleID   int64     `json:"mesocycle_id"`
+	MesocycleName string    `json:"mesocycle_name"`
+	RecordedSets  int       `json:"recorded_sets"`
+	TotalVolumeKg float64   `json:"total_volume_kg"`
+	Exercises     []string  `json:"exercises"`
+}
+
+// ListForUser returns the user's sessions across ALL mesocycles, newest
+// first, paginated. Tonnage counts both limbs for unilateral sets
+// ((left+right)×reps); exercise names are ordered by first recorded set.
+func (m WorkoutSessionModel) ListForUser(userID int64, page, pageSize int) ([]SessionSummary, int, error) {
+	query := `
+		SELECT count(*) OVER(), ws.id, ws.performed_at, td.label, ws.mesocycle_id, mc.name,
+		       (SELECT count(*) FROM workout_sets s WHERE s.workout_session_id = ws.id AND s.recorded),
+		       COALESCE((SELECT SUM(CASE WHEN s.weight_left IS NOT NULL THEN (s.weight_left + s.weight_right) * s.reps ELSE s.weight * s.reps END)
+		                 FROM workout_sets s WHERE s.workout_session_id = ws.id AND s.recorded), 0),
+		       COALESCE((SELECT array_agg(x.name ORDER BY x.first_set_id)
+		                 FROM (SELECT e.name, MIN(s.id) AS first_set_id
+		                       FROM workout_sets s
+		                       JOIN exercises e ON s.exercise_id = e.id
+		                       WHERE s.workout_session_id = ws.id AND s.recorded
+		                       GROUP BY e.name) x), '{}')
+		FROM workout_sessions ws
+		JOIN training_days td ON ws.training_day_id = td.id
+		JOIN mesocycles mc ON ws.mesocycle_id = mc.id
+		WHERE ws.user_id = $1
+		ORDER BY ws.performed_at DESC, ws.id DESC
+		LIMIT $2 OFFSET $3`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	rows, err := m.DB.QueryContext(ctx, query, userID, pageSize, (page-1)*pageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var total int
+	var summaries []SessionSummary
+	for rows.Next() {
+		var s SessionSummary
+		var exercises pq.StringArray
+		err := rows.Scan(
+			&total, &s.ID, &s.PerformedAt, &s.DayLabel, &s.MesocycleID, &s.MesocycleName,
+			&s.RecordedSets, &s.TotalVolumeKg, &exercises,
+		)
+		if err != nil {
+			return nil, 0, err
+		}
+		s.Exercises = []string(exercises)
+		if s.Exercises == nil {
+			s.Exercises = []string{}
+		}
+		summaries = append(summaries, s)
+	}
+	return summaries, total, rows.Err()
 }
 
 func (m WorkoutSessionModel) ListForMesocycle(userID, mesocycleID int64) ([]*WorkoutSession, error) {

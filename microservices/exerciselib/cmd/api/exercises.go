@@ -16,6 +16,7 @@ func (app *application) createExerciseHandler(w http.ResponseWriter, r *http.Req
 	var input struct {
 		Name              string            `json:"name"`
 		Type              data.ExerciseType `json:"type"`
+		Laterality        string            `json:"laterality"`
 		MovementPatternID int64             `json:"movement_pattern_id"`
 		PrimaryMuscles    []int64           `json:"primary_muscles"`
 		SecondaryMuscles  []int64           `json:"secondary_muscles"`
@@ -28,9 +29,16 @@ func (app *application) createExerciseHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Almost every exercise is bilateral; older clients that don't send the
+	// field get the same default the schema applies.
+	if input.Laterality == "" {
+		input.Laterality = data.LateralityBilateral
+	}
+
 	exercise := &data.Exercise{
 		Name:              input.Name,
 		Type:              input.Type,
+		Laterality:        input.Laterality,
 		MovementPatternID: input.MovementPatternID,
 	}
 
@@ -123,6 +131,7 @@ func (app *application) updateExerciseHandler(w http.ResponseWriter, r *http.Req
 	var input struct {
 		Name              *string            `json:"name"`
 		Type              *data.ExerciseType `json:"type"`
+		Laterality        *string            `json:"laterality"`
 		MovementPatternID *int64             `json:"movement_pattern_id"`
 		PrimaryMuscles    []int64            `json:"primary_muscles"`
 		SecondaryMuscles  []int64            `json:"secondary_muscles"`
@@ -141,6 +150,10 @@ func (app *application) updateExerciseHandler(w http.ResponseWriter, r *http.Req
 
 	if input.Type != nil {
 		exercise.Type = *input.Type
+	}
+
+	if input.Laterality != nil {
+		exercise.Laterality = *input.Laterality
 	}
 
 	if input.MovementPatternID != nil {

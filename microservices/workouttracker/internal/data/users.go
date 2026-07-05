@@ -7,8 +7,8 @@ import (
 	"errors"
 	"time"
 
-	"workouttracker.jcroyoaun.io/internal/validator"
 	"golang.org/x/crypto/bcrypt"
+	"workouttracker.jcroyoaun.io/internal/validator"
 )
 
 var ErrDuplicateEmail = errors.New("duplicate email")

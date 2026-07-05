@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useLocation, Link } from 'react-router-dom'
 import { api } from '../api/client'
 import PageHeader from '../components/ui/PageHeader'
 import BottomSheet from '../components/ui/BottomSheet'
@@ -8,11 +8,18 @@ import { PageSkeleton } from '../components/ui/Skeleton'
 import { useToast } from '../lib/toastContext'
 import { getActiveSession } from '../lib/activeSession'
 
+// Trim trailing zeros off a stored decimal weight: 60.00 → "60", 57.50 → "57.5".
+function fmtWeight(v) {
+  const n = Number(v)
+  return Number.isFinite(n) ? String(parseFloat(n.toFixed(2))) : String(v)
+}
+
 // Read-only view of a logged workout. The active session gets a "Continue
 // logging" banner; past sessions get an edit escape hatch into the same
 // logger, plus editable notes.
 export default function SessionDetail() {
   const { id } = useParams()
+  const location = useLocation()
   const [data, setData] = useState(null)
   const [error, setError] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
@@ -45,38 +52,52 @@ export default function SessionDetail() {
   if (error) return <div className="py-12 text-center text-danger">Could not load workout.</div>
   if (!data) return <PageSkeleton />
 
-  const { session, sets = [] } = data
+  const { session, sets = [], exercise_notes: exerciseNotes = [] } = data
+  const noteByExercise = new Map(
+    exerciseNotes.filter((n) => n.note).map((n) => [n.exercise_id, n.note])
+  )
 
-  // Group sets by exercise, preserving first-seen (logging) order.
+  // Group sets by exercise, then order groups by lowest set id — the order
+  // the lifter actually logged them (the server may return exercise_id order).
   const byExercise = new Map()
   for (const s of sets) {
     if (!byExercise.has(s.exercise_id)) {
-      byExercise.set(s.exercise_id, { name: s.exercise_name, sets: [] })
+      byExercise.set(s.exercise_id, { exerciseId: s.exercise_id, name: s.exercise_name, sets: [] })
     }
     byExercise.get(s.exercise_id).sets.push(s)
   }
-  const exercises = [...byExercise.values()].map((ex) => ({
-    ...ex,
-    sets: [...ex.sets].sort((a, b) => a.set_number - b.set_number),
-  }))
+  const exercises = [...byExercise.values()]
+    .map((ex) => ({
+      ...ex,
+      firstSetId: Math.min(...ex.sets.map((s) => s.id ?? Number.MAX_SAFE_INTEGER)),
+      sets: [...ex.sets].sort((a, b) => a.set_number - b.set_number),
+    }))
+    .sort((a, b) => a.firstSetId - b.firstSetId)
   const recordedCount = sets.filter((s) => s.recorded).length
 
-  const dateLine = session.performed_at
-    ? new Date(session.performed_at).toLocaleDateString('en-US', {
+  const subtitleParts = []
+  if (session.performed_at) {
+    const performed = new Date(session.performed_at)
+    subtitleParts.push(
+      performed.toLocaleDateString('en-US', {
         weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
-      })
-    : ''
+      }),
+      performed.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    )
+  }
+  subtitleParts.push(`${recordedCount} ${recordedCount === 1 ? 'set' : 'sets'} recorded`)
 
   return (
     <div className="space-y-4">
       <PageHeader
         title={session.day_label}
-        subtitle={`${dateLine} · ${recordedCount} sets recorded`}
-        backTo="/"
+        subtitle={subtitleParts.join(' · ')}
+        backTo={location.state?.from === 'history' ? '/history' : '/'}
         action={
           !isActive && (
             <Link
               to={`/workout/${id}`}
+              state={{ edit: true }}
               className="inline-flex min-h-11 items-center rounded-btn border border-line-2 bg-card px-3.5 text-sm font-semibold text-ink-2 transition-all active:scale-[0.97] active:bg-sunken"
             >
               Edit workout
@@ -102,9 +123,14 @@ export default function SessionDetail() {
         </div>
       ) : (
         exercises.map((ex) => (
-          <div key={ex.name} className="overflow-hidden rounded-card border border-line bg-card shadow-card">
+          <div key={ex.exerciseId} className="overflow-hidden rounded-card border border-line bg-card shadow-card">
             <div className="border-b border-line px-4 py-3">
               <h3 className="text-[15px] font-semibold text-ink">{ex.name}</h3>
+              {noteByExercise.has(ex.exerciseId) && (
+                <p className="mt-1.5 inline-block max-w-full rounded-field bg-wash px-2 py-1 text-sm text-ink-3">
+                  📝 {noteByExercise.get(ex.exerciseId)}
+                </p>
+              )}
             </div>
             <div className="divide-y divide-line">
               {ex.sets.map((s) => (
@@ -112,7 +138,9 @@ export default function SessionDetail() {
                   <span className="text-[13px] text-ink-3">Set {s.set_number}</span>
                   <div className="flex items-center gap-3 tabular-nums">
                     <span className="text-sm font-medium text-ink">
-                      {s.weight} kg × {s.reps}
+                      {s.weight_left != null && s.weight_right != null
+                        ? `R ${fmtWeight(s.weight_right)} / L ${fmtWeight(s.weight_left)} kg × ${s.reps}`
+                        : `${s.weight} kg × ${s.reps}`}
                     </span>
                     {s.recorded ? (
                       s.rir != null && (

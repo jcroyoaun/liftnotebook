@@ -282,3 +282,15 @@ INSERT INTO exercise_muscles (exercise_id, muscle_id, target_type) VALUES
 -- Single Leg Leg Curl
 (59, 17, 'primary'), (59, 18, 'primary'), (59, 19, 'primary')
 ON CONFLICT (exercise_id, muscle_id) DO NOTHING;
+
+-- Laterality backfill (mirrors migration 000009): on fresh environments the
+-- migration runs against an empty catalog, so the seed re-applies it. The
+-- DO-block guard keeps this seed runnable against pre-000009 schemas.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'exercises' AND column_name = 'laterality') THEN
+    UPDATE exercises SET laterality = 'unilateral'
+    WHERE name ~* 'single[ -]?leg|single[ -]?arm|one[ -]?arm|split squat|bulgarian|lunge|step[ -]?up|pistol';
+  END IF;
+END $$;

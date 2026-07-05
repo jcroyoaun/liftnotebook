@@ -56,6 +56,19 @@ func (m PushSubscriptionModel) DeleteByEndpoint(endpoint string) error {
 	return err
 }
 
+// HasForUser reports whether the user has at least one push subscription —
+// the cheap check for "is scheduling a rest alarm worth it at all".
+func (m PushSubscriptionModel) HasForUser(userID int64) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM push_subscriptions WHERE user_id = $1)`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	var exists bool
+	err := m.DB.QueryRowContext(ctx, query, userID).Scan(&exists)
+	return exists, err
+}
+
 func (m PushSubscriptionModel) GetForUser(userID int64) ([]PushSubscription, error) {
 	query := `
 		SELECT id, user_id, endpoint, p256dh, auth

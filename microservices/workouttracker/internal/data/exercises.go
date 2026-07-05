@@ -11,6 +11,7 @@ type Exercise struct {
 	ID                int64            `json:"id"`
 	Name              string           `json:"name"`
 	Type              string           `json:"type"`
+	Laterality        string           `json:"laterality"`
 	MovementPatternID int64            `json:"movement_pattern_id"`
 	MovementPattern   string           `json:"movement_pattern,omitempty"`
 	Targets           []ExerciseTarget `json:"targets,omitempty"`
@@ -29,7 +30,7 @@ type ExerciseReader struct {
 
 func (r ExerciseReader) GetAll() ([]Exercise, error) {
 	query := `
-		SELECT e.id, e.name, e.type::text, e.movement_pattern_id, COALESCE(mp.name, '')
+		SELECT e.id, e.name, e.type::text, e.laterality, e.movement_pattern_id, COALESCE(mp.name, '')
 		FROM exercises e
 		LEFT JOIN movement_patterns mp ON e.movement_pattern_id = mp.id
 		ORDER BY e.name`
@@ -46,7 +47,7 @@ func (r ExerciseReader) GetAll() ([]Exercise, error) {
 	var exercises []Exercise
 	for rows.Next() {
 		var e Exercise
-		err := rows.Scan(&e.ID, &e.Name, &e.Type, &e.MovementPatternID, &e.MovementPattern)
+		err := rows.Scan(&e.ID, &e.Name, &e.Type, &e.Laterality, &e.MovementPatternID, &e.MovementPattern)
 		if err != nil {
 			return nil, err
 		}
@@ -57,7 +58,7 @@ func (r ExerciseReader) GetAll() ([]Exercise, error) {
 
 func (r ExerciseReader) Get(id int64) (*Exercise, error) {
 	query := `
-		SELECT e.id, e.name, e.type::text, e.movement_pattern_id, COALESCE(mp.name, '')
+		SELECT e.id, e.name, e.type::text, e.laterality, e.movement_pattern_id, COALESCE(mp.name, '')
 		FROM exercises e
 		LEFT JOIN movement_patterns mp ON e.movement_pattern_id = mp.id
 		WHERE e.id = $1`
@@ -68,7 +69,7 @@ func (r ExerciseReader) Get(id int64) (*Exercise, error) {
 	defer cancel()
 
 	err := r.DB.QueryRowContext(ctx, query, id).Scan(
-		&exercise.ID, &exercise.Name, &exercise.Type, &exercise.MovementPatternID, &exercise.MovementPattern,
+		&exercise.ID, &exercise.Name, &exercise.Type, &exercise.Laterality, &exercise.MovementPatternID, &exercise.MovementPattern,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -107,14 +108,17 @@ func (r ExerciseReader) Get(id int64) (*Exercise, error) {
 
 // GetUserExercises returns distinct exercises the user has logged at least one recorded set for.
 func (r ExerciseReader) GetUserExercises(userID int64) ([]Exercise, error) {
+	// Most recently trained first: the Progress chip row default-selects the
+	// first entry, and "what did I just do" beats the alphabet every time.
 	query := `
-		SELECT DISTINCT e.id, e.name, e.type::text, e.movement_pattern_id, COALESCE(mp.name, '')
+		SELECT e.id, e.name, e.type::text, e.laterality, e.movement_pattern_id, COALESCE(mp.name, '')
 		FROM exercises e
 		LEFT JOIN movement_patterns mp ON e.movement_pattern_id = mp.id
 		JOIN workout_sets ws ON ws.exercise_id = e.id
 		JOIN workout_sessions s ON ws.workout_session_id = s.id
 		WHERE s.user_id = $1 AND ws.recorded = true
-		ORDER BY e.name`
+		GROUP BY e.id, e.name, e.type, e.laterality, e.movement_pattern_id, mp.name
+		ORDER BY MAX(s.performed_at) DESC, e.name`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -128,7 +132,7 @@ func (r ExerciseReader) GetUserExercises(userID int64) ([]Exercise, error) {
 	var exercises []Exercise
 	for rows.Next() {
 		var e Exercise
-		err := rows.Scan(&e.ID, &e.Name, &e.Type, &e.MovementPatternID, &e.MovementPattern)
+		err := rows.Scan(&e.ID, &e.Name, &e.Type, &e.Laterality, &e.MovementPatternID, &e.MovementPattern)
 		if err != nil {
 			return nil, err
 		}

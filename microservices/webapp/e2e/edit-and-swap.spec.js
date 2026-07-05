@@ -88,10 +88,10 @@ test.describe.serial('Swap, edit past workout, and notes', () => {
     await expect(card).toBeVisible()
     await expect(card.locator('text=usually Overhead Press')).toBeVisible()
 
-    // Log a set under the swapped-in exercise.
-    await card.locator('button:has-text("Add Set")').click()
-    await card.locator('button[aria-label="increase weight"]').click()
-    await card.locator('button:has-text("Done")').click()
+    // Log a set under the swapped-in exercise. Planned set rows are
+    // pre-created as drafts, so no "+ Add Set" needed — touch the first row.
+    await card.locator('button[aria-label="increase weight"]').first().click()
+    await card.locator('button:has-text("Done")').first().click()
     await expect(card.locator('text=Logged')).toBeVisible()
 
     await expect
@@ -134,15 +134,17 @@ test.describe.serial('Swap, edit past workout, and notes', () => {
     await page.click('text=Edit workout')
     await expect(page).toHaveURL(`/workout/${sessionId}`)
 
+    // Editing a finished workout is a distinct mode: no summary sheet, no
+    // re-celebration — "Done editing" returns straight to the record.
+    await expect(page.getByRole('button', { name: 'Done editing' })).toBeVisible()
+
     const card = page.locator('[class*="rounded-card"]').filter({ hasText: 'Barbell Back Squat' })
-    await card.locator('button:has-text("Add Set")').click()
-    await card.locator('button[aria-label="increase weight"]').click()
-    await card.locator('button:has-text("Done")').click()
+    await card.locator('button[aria-label="increase weight"]').first().click()
+    await card.locator('button:has-text("Done")').first().click()
     await expect(card.locator('text=Logged')).toBeVisible()
 
-    await page.click('button:has-text("Finish")')
-    await page.click('button:has-text("Back to Today")')
-    await expect(page).toHaveURL('/')
+    await page.click('button:has-text("Done editing")')
+    await expect(page).toHaveURL(`/sessions/${sessionId}`)
 
     await expect
       .poll(async () => (await api(`/sessions/${sessionId}`)).sets.length, { timeout: 10000 })

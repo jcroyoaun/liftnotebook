@@ -49,20 +49,39 @@ func (app *application) exportMesocycleHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	notes, err := app.models.ExerciseNotes.GetForMesocycle(userID, meso.ID)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
 	setsBySession := make(map[int64][]data.WorkoutSet)
 	for _, s := range sets {
 		setsBySession[s.WorkoutSessionID] = append(setsBySession[s.WorkoutSessionID], s)
 	}
 
+	notesBySession := make(map[int64][]data.ExerciseNote)
+	for _, n := range notes {
+		notesBySession[n.WorkoutSessionID] = append(notesBySession[n.WorkoutSessionID], n)
+	}
+
 	type sessionExport struct {
 		*data.WorkoutSession
-		Sets []data.WorkoutSet `json:"sets"`
+		Sets          []data.WorkoutSet   `json:"sets"`
+		ExerciseNotes []data.ExerciseNote `json:"exercise_notes"`
 	}
 	sessionExports := make([]sessionExport, 0, len(sessions))
 	for _, sess := range sessions {
-		exp := sessionExport{WorkoutSession: sess, Sets: setsBySession[sess.ID]}
+		exp := sessionExport{
+			WorkoutSession: sess,
+			Sets:           setsBySession[sess.ID],
+			ExerciseNotes:  notesBySession[sess.ID],
+		}
 		if exp.Sets == nil {
 			exp.Sets = []data.WorkoutSet{}
+		}
+		if exp.ExerciseNotes == nil {
+			exp.ExerciseNotes = []data.ExerciseNote{}
 		}
 		sessionExports = append(sessionExports, exp)
 	}

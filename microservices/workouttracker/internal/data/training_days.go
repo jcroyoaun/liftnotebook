@@ -20,10 +20,13 @@ type TrainingDay struct {
 }
 
 type TrainingExercise struct {
-	ID                 int64  `json:"id"`
-	TrainingDayID      int64  `json:"training_day_id"`
-	ExerciseID         int64  `json:"exercise_id"`
-	ExerciseName       string `json:"exercise_name"`
+	ID            int64  `json:"id"`
+	TrainingDayID int64  `json:"training_day_id"`
+	ExerciseID    int64  `json:"exercise_id"`
+	ExerciseName  string `json:"exercise_name"`
+	// Laterality is read-only catalog data (bilateral|unilateral) joined in
+	// for the logger, so unilateral exercises show per-limb weight inputs.
+	Laterality         string `json:"laterality,omitempty"`
 	Position           int    `json:"position"`
 	TargetSets         int    `json:"target_sets"`
 	TargetRepRangeLow  int    `json:"target_rep_range_low"`
@@ -207,7 +210,7 @@ func (m TrainingDayModel) RemoveExercise(id int64) error {
 
 func (m TrainingDayModel) GetExercisesForDay(trainingDayID int64) ([]TrainingExercise, error) {
 	query := `
-		SELECT tde.id, tde.training_day_id, tde.exercise_id, e.name, tde.position, tde.target_sets,
+		SELECT tde.id, tde.training_day_id, tde.exercise_id, e.name, e.laterality, tde.position, tde.target_sets,
 		       tde.target_rep_range_low, tde.target_rep_range_high, tde.target_rir
 		FROM training_day_exercises tde
 		JOIN exercises e ON tde.exercise_id = e.id
@@ -226,7 +229,7 @@ func (m TrainingDayModel) GetExercisesForDay(trainingDayID int64) ([]TrainingExe
 	var exercises []TrainingExercise
 	for rows.Next() {
 		var te TrainingExercise
-		err := rows.Scan(&te.ID, &te.TrainingDayID, &te.ExerciseID, &te.ExerciseName, &te.Position, &te.TargetSets,
+		err := rows.Scan(&te.ID, &te.TrainingDayID, &te.ExerciseID, &te.ExerciseName, &te.Laterality, &te.Position, &te.TargetSets,
 			&te.TargetRepRangeLow, &te.TargetRepRangeHigh, &te.TargetRIR)
 		if err != nil {
 			return nil, err

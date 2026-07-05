@@ -21,6 +21,7 @@ function exerciseApp() {
         movementPatterns: [],
         bodyParts: [],
         exerciseTypes: ['compound', 'isolation'],
+        lateralityOptions: ['bilateral', 'unilateral'],
         
         // Stats
         stats: {
@@ -42,6 +43,7 @@ function exerciseApp() {
         formData: {
             name: '',
             type: '',
+            laterality: 'bilateral',
             movement_pattern_id: '',
             primary_muscles: [],
             secondary_muscles: []
@@ -158,6 +160,7 @@ function exerciseApp() {
                 this.formData = {
                     name: exercise.name,
                     type: exercise.type,
+                    laterality: exercise.laterality || 'bilateral',
                     movement_pattern_id: exercise.movement_pattern_id,
                     primary_muscles: exercise.primary_muscles?.map(m => m.id) || [],
                     secondary_muscles: exercise.secondary_muscles?.map(m => m.id) || []
@@ -167,6 +170,7 @@ function exerciseApp() {
                 this.formData = {
                     name: '',
                     type: '',
+                    laterality: 'bilateral',
                     movement_pattern_id: '',
                     primary_muscles: [],
                     secondary_muscles: []
@@ -245,6 +249,7 @@ function exerciseApp() {
                 const payload = {
                     name: this.formData.name,
                     type: this.formData.type,
+                    laterality: this.formData.laterality,
                     movement_pattern_id: parseInt(this.formData.movement_pattern_id),
                     primary_muscles: this.formData.primary_muscles,
                     secondary_muscles: this.formData.secondary_muscles

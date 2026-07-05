@@ -364,11 +364,23 @@
                                 <label for="form-type" class="block text-sm font-semibold text-gray-700">
                                     Exercise Type <span class="text-red-500">*</span>
                                 </label>
-                                <select id="form-type" x-model="formData.type" 
+                                <select id="form-type" x-model="formData.type"
                                         class="modern-select" required>
                                     <option value="">Choose a type</option>
                                     <template x-for="type in exerciseTypes" :key="type">
                                         <option :value="type" x-text="capitalizeFirst(type)"></option>
+                                    </template>
+                                </select>
+                            </div>
+
+                            <div class="space-y-2">
+                                <label for="form-laterality" class="block text-sm font-semibold text-gray-700">
+                                    Laterality <span class="text-red-500">*</span>
+                                </label>
+                                <select id="form-laterality" x-model="formData.laterality"
+                                        class="modern-select" required>
+                                    <template x-for="laterality in lateralityOptions" :key="laterality">
+                                        <option :value="laterality" x-text="capitalizeFirst(laterality)"></option>
                                     </template>
                                 </select>
                             </div>

@@ -19,6 +19,14 @@ const (
 	ExerciseTypeIsolation ExerciseType = "isolation"
 )
 
+// Laterality: whether the movement loads both limbs at once or one at a
+// time. Distinct from Type — barbell curl is isolation+bilateral, Bulgarian
+// split squat is compound+unilateral.
+const (
+	LateralityBilateral  = "bilateral"
+	LateralityUnilateral = "unilateral"
+)
+
 // Muscle represents a muscle in the database
 type Muscle struct {
 	ID        int64     `json:"id"`
@@ -41,6 +49,7 @@ type Exercise struct {
 	CreatedAt         time.Time        `json:"-"`
 	Name              string           `json:"name"`
 	Type              ExerciseType     `json:"type"`
+	Laterality        string           `json:"laterality"`
 	MovementPatternID int64            `json:"movement_pattern_id"`
 	MovementPattern   *MovementPattern `json:"movement_pattern,omitempty"`
 	PrimaryMuscles    []Muscle         `json:"primary_muscles,omitempty"`
@@ -54,11 +63,11 @@ type ExerciseModel struct {
 
 func (e ExerciseModel) Insert(exercise *Exercise) error {
 	query := `
-        INSERT INTO exercises(name, type, movement_pattern_id)
-		VALUES ($1, $2, $3)
+        INSERT INTO exercises(name, type, laterality, movement_pattern_id)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id, created_at, version`
 
-	args := []any{exercise.Name, exercise.Type, exercise.MovementPatternID}
+	args := []any{exercise.Name, exercise.Type, exercise.Laterality, exercise.MovementPatternID}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -152,7 +161,7 @@ func (e ExerciseModel) Get(id int64) (*Exercise, error) {
 	}
 
 	query := `
-		SELECT e.id, e.created_at, e.name, e.type, e.movement_pattern_id, e.version,
+		SELECT e.id, e.created_at, e.name, e.type, e.laterality, e.movement_pattern_id, e.version,
 		       mp.name as movement_pattern_name, mp.description as movement_pattern_description
 		FROM exercises e
 		LEFT JOIN movement_patterns mp ON e.movement_pattern_id = mp.id
@@ -169,6 +178,7 @@ func (e ExerciseModel) Get(id int64) (*Exercise, error) {
 		&exercise.CreatedAt,
 		&exercise.Name,
 		&exercise.Type,
+		&exercise.Laterality,
 		&exercise.MovementPatternID,
 		&exercise.Version,
 		&movementPattern.Name,
@@ -245,13 +255,14 @@ func (e ExerciseModel) getMusclesForExercise(exercise *Exercise) error {
 func (e ExerciseModel) Update(exercise *Exercise) error {
 	query := `
 		UPDATE exercises
-		SET name = $1, type = $2, movement_pattern_id = $3, version = version + 1
-		WHERE id = $4 AND version = $5
+		SET name = $1, type = $2, laterality = $3, movement_pattern_id = $4, version = version + 1
+		WHERE id = $5 AND version = $6
 		RETURNING version`
 
 	args := []any{
 		exercise.Name,
 		exercise.Type,
+		exercise.Laterality,
 		exercise.MovementPatternID,
 		exercise.ID,
 		exercise.Version,
@@ -305,7 +316,7 @@ func (e ExerciseModel) Delete(id int64) error {
 func (e ExerciseModel) GetAll(name string, exerciseType ExerciseType, movementPatternID int64, movementPatternName string, bodyPart string, muscleID int64, filters Filters) ([]*Exercise, Metadata, error) {
 	// Base query with exercise and movement pattern data
 	baseQuery := `
-		SELECT DISTINCT count(*) OVER(), e.id, e.created_at, e.name, e.type, e.movement_pattern_id, e.version,
+		SELECT DISTINCT count(*) OVER(), e.id, e.created_at, e.name, e.type, e.laterality, e.movement_pattern_id, e.version,
 		       mp.name as movement_pattern_name, mp.description as movement_pattern_description
 		FROM exercises e
 		LEFT JOIN movement_patterns mp ON e.movement_pattern_id = mp.id`
@@ -396,6 +407,7 @@ func (e ExerciseModel) GetAll(name string, exerciseType ExerciseType, movementPa
 			&exercise.CreatedAt,
 			&exercise.Name,
 			&exercise.Type,
+			&exercise.Laterality,
 			&exercise.MovementPatternID,
 			&exercise.Version,
 			&movementPattern.Name,
@@ -433,6 +445,9 @@ func ValidateExercise(v *validator.Validator, exercise *Exercise) {
 
 	v.Check(exercise.Type != "", "type", "must be provided")
 	v.Check(exercise.Type == ExerciseTypeCompound || exercise.Type == ExerciseTypeIsolation, "type", "must be either 'compound' or 'isolation'")
+
+	v.Check(exercise.Laterality != "", "laterality", "must be provided")
+	v.Check(exercise.Laterality == LateralityBilateral || exercise.Laterality == LateralityUnilateral, "laterality", "must be either 'bilateral' or 'unilateral'")
 
 	v.Check(exercise.MovementPatternID > 0, "movement_pattern_id", "must be a positive integer")
 }

@@ -64,7 +64,7 @@ func (app *application) createMesocycleHandler(w http.ResponseWriter, r *http.Re
 
 	err = app.writeJSON(w, http.StatusCreated, envelope{
 		"mesocycle": meso,
-		"days":     days,
+		"days":      days,
 	}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
@@ -95,7 +95,7 @@ func (app *application) getActiveMesocycleHandler(w http.ResponseWriter, r *http
 
 	err = app.writeJSON(w, http.StatusOK, envelope{
 		"mesocycle": meso,
-		"days":     days,
+		"days":      days,
 	}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
@@ -129,7 +129,7 @@ func (app *application) getMesocycleHandler(w http.ResponseWriter, r *http.Reque
 
 	err = app.writeJSON(w, http.StatusOK, envelope{
 		"mesocycle": meso,
-		"days":     days,
+		"days":      days,
 	}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)

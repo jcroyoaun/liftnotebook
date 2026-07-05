@@ -16,14 +16,26 @@ const EXPORT = {
   ],
   sessions: [
     {
-      day_label: 'Upper A', performed_at: '2026-07-04T18:00:00Z',
+      id: 42, day_label: 'Upper A', performed_at: '2026-07-04T18:00:00Z',
       sets: [
         { exercise_name: 'Machine Chest Press', set_number: 1, weight: 80, reps: 10, rir: 0, recorded: true },
-        { exercise_name: 'Machine Chest Press', set_number: 2, weight: 80, reps: 8, rir: null, recorded: false },
+        { exercise_name: 'Machine Chest Press', set_number: 2, weight: 80, weight_left: 37.5, weight_right: 40, reps: 8, rir: null, recorded: false },
       ],
     },
-    { day_label: 'Upper A', performed_at: '2026-07-01T18:00:00Z', sets: [] },
+    { id: 41, day_label: 'Upper A', performed_at: '2026-07-01T18:00:00Z', sets: [] },
   ],
+}
+
+// The CSV uses LOCAL date/time (matching what the app displays), so expected
+// values are computed the same way the exporter does — the test must pass in
+// any timezone (CI runs UTC, laptops don't).
+function expectedLocal(iso) {
+  const d = new Date(iso)
+  const p = (n) => String(n).padStart(2, '0')
+  return {
+    date: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`,
+    time: `${p(d.getHours())}:${p(d.getMinutes())}`,
+  }
 }
 
 test('program CSV: header + one row per slot, commas/quotes escaped', () => {
@@ -34,12 +46,13 @@ test('program CSV: header + one row per slot, commas/quotes escaped', () => {
   assert.ok(lines[2].includes('Pec Deck,1'))
 })
 
-test('history CSV: oldest session first, one row per set, null rir blank', () => {
+test('history CSV: oldest session first, one row per set, null rir blank, L/R columns', () => {
   const lines = toHistoryCSV(EXPORT).trim().split('\n')
   assert.equal(lines.length, 3) // header + 2 sets (empty session adds none)
-  assert.equal(lines[0], 'date,day_label,exercise,set_number,weight_kg,reps,rir,recorded')
-  assert.equal(lines[1], '2026-07-04,Upper A,Machine Chest Press,1,80,10,0,true')
-  assert.equal(lines[2], '2026-07-04,Upper A,Machine Chest Press,2,80,8,,false')
+  assert.equal(lines[0], 'date,time,session_id,day_label,exercise,set_number,weight_kg,weight_left_kg,weight_right_kg,reps,rir,recorded')
+  const { date, time } = expectedLocal('2026-07-04T18:00:00Z')
+  assert.equal(lines[1], `${date},${time},42,Upper A,Machine Chest Press,1,80,,,10,0,true`)
+  assert.equal(lines[2], `${date},${time},42,Upper A,Machine Chest Press,2,80,37.5,40,8,,false`)
 })
 
 test('csvEscape handles quotes, commas, newlines, null', () => {

@@ -44,6 +44,13 @@ export default function RestTimer({ endsAt, onDismiss, onAdjust }) {
 
   const remaining = endsAt ? Math.max(0, Math.round((endsAt - now) / 1000)) : 0
   const done = endsAt && remaining === 0
+  const elapsedOver = endsAt ? Math.round((now - endsAt) / 1000) : 0
+
+  // The "Go!" banner earns ~a minute of attention, then gets out of the way
+  // on its own — nobody should owe the bar a Dismiss tap mid-workout.
+  useEffect(() => {
+    if (done && elapsedOver >= 60) onDismiss()
+  }, [done, elapsedOver, onDismiss])
 
   // Chime + vibrate once when the timer elapses.
   useEffect(() => {

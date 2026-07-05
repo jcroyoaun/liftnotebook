@@ -35,6 +35,9 @@ export function applySwaps(dayExercises, swaps) {
       ...ex,
       exercise_id: to.exercise_id,
       exercise_name: to.exercise_name,
+      // The replacement's own laterality rides the swap — a bilateral slot
+      // swapped for a single-leg movement still logs per-limb.
+      laterality: to.laterality ?? ex.laterality,
       swapped_from: ex.exercise_name,
     }
   })

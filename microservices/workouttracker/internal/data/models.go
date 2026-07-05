@@ -18,6 +18,7 @@ type Models struct {
 	Templates       TemplateModel
 	WorkoutSessions WorkoutSessionModel
 	WorkoutSets     WorkoutSetModel
+	ExerciseNotes   ExerciseNoteModel
 	Exercises       ExerciseReader
 	Progress        ProgressModel
 	Progression     ProgressionModel
@@ -34,6 +35,7 @@ func NewModels(db *sql.DB) Models {
 		Templates:       TemplateModel{DB: db},
 		WorkoutSessions: WorkoutSessionModel{DB: db},
 		WorkoutSets:     WorkoutSetModel{DB: db},
+		ExerciseNotes:   ExerciseNoteModel{DB: db},
 		Exercises:       ExerciseReader{DB: db},
 		Progress:        ProgressModel{DB: db},
 		Progression:     ProgressionModel{DB: db},

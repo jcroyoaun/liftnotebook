@@ -7,6 +7,20 @@ import Button from '../components/ui/Button'
 
 // Redeems a one-time reset code. There is no email delivery on purpose —
 // codes come from the admin (the person who runs this LiftNotebook).
+
+// API validation errors arrive as 'field: message' — strip the field prefix
+// and translate the common rejection into human copy.
+function friendlyError(raw) {
+  const msg = String(raw || '')
+    .split('\n')
+    .map(line => line.replace(/^[a-z_]+:\s*/i, ''))
+    .join('\n')
+  if (msg.includes('invalid or expired reset code')) {
+    return "That reset code didn't work — it may have expired. Ask your admin for a fresh one."
+  }
+  return msg
+}
+
 export default function ResetPassword() {
   const [token, setToken] = useState('')
   const [password, setPassword] = useState('')
@@ -27,7 +41,7 @@ export default function ResetPassword() {
       await api.resetPassword({ token: token.trim().toUpperCase(), password })
       setDone(true)
     } catch (err) {
-      setError(err.message)
+      setError(friendlyError(err.message))
     } finally {
       setLoading(false)
     }

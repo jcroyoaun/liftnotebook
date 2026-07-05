@@ -70,10 +70,10 @@ test.describe.serial('Offline set logging', () => {
     // Kill the network.
     await context.setOffline(true)
 
-    // Log a set entirely offline.
-    await page.click('button:has-text("Add Set")')
-    await page.locator('button[aria-label="increase weight"]').click() // 0 -> 2.5
-    await page.click('button:has-text("Done")')
+    // Log a set entirely offline. Planned rows are pre-created as local
+    // drafts (nothing on the server yet) — touch the first one.
+    await page.locator('button[aria-label="increase weight"]').first().click() // 0 -> 2.5
+    await page.locator('button:has-text("Done")').first().click()
 
     // Optimistic UI: the set shows as logged immediately, and once the
     // debounced write fires it queues as a pending mutation.
@@ -111,9 +111,10 @@ test.describe.serial('Offline set logging', () => {
 
     await context.setOffline(true)
 
-    // Bump the weight twice offline: 2.5 -> 7.5.
-    await page.locator('button[aria-label="increase weight"]').click()
-    await page.locator('button[aria-label="increase weight"]').click()
+    // Bump the weight twice offline: 2.5 -> 7.5. The synced set renders
+    // first; the plan's second row sits below it as an untouched draft.
+    await page.locator('button[aria-label="increase weight"]').first().click()
+    await page.locator('button[aria-label="increase weight"]').first().click()
     await expect(page.getByTestId('sync-status')).toContainText('pending', { timeout: 5000 })
 
     await context.setOffline(false)

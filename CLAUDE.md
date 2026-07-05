@@ -55,7 +55,7 @@ are just different per-exercise target values.
   input-side toggle in the logger (`src/lib/units.js` converts at commit).
 - House philosophy in UI copy: sets + "to failure" — never surface rep-range
   prescriptions (the target_rep_range columns are inert defaults).
-- Mobile-first: bottom tab bar (Today / Programs / Progress), FocusLayout for
+- Mobile-first: bottom tab bar (Today / History / Programs / Progress), FocusLayout for
   active workouts, safe-area padding. An in-progress workout is minimizable
   (chevron in the logger header) — `ActiveWorkoutBar` docks a persistent
   mini-bar above the tab bar until Finish. `/sessions/:id` is the read-only
@@ -126,12 +126,47 @@ are just different per-exercise target values.
   via localStorage `sessionSwaps:*` + optional persist to the day template),
   rest-timer web push (VAPID keypair in `liftnotebook-app-secrets`
   vapid-public/private-key, `push_subscriptions` table, in-memory per-user
-  alarm scheduler — single replica by design; Settings toggle; sw.js push
-  handler skips the banner when the app is visible), edit-past-workout
+  alarm scheduler — single replica by design; Settings toggle), edit-past-workout
   escape hatch (/sessions/:id → Edit workout → /workout/:id) + session
   notes (PATCH /v1/sessions/:id). Playwright: e2e/edit-and-swap.spec.js;
   role-name locators must use exact: true (swap buttons share exercise-name
   substrings).
+
+- ✅ Benchmark batch (2026-07-04, persona UX benchmark → fixes): migration
+  000009. (1) Data integrity: RIR chips select-only (tap-on-selected is a
+  no-op; new sets never inherit RIR), sync no longer clobbers in-flight edits
+  (onSuccess merges only id/version), NumberStepper select-race fixed +
+  sanity clamps (500 kg / 100 reps). (2) History first-class: History tab
+  (/history, GET /v1/me/sessions paginated cross-block), per-set "Last:"
+  ghosts + dated full-set "Last time" line in the logger (suggestions carry
+  last_sets/last_performed_at/last_notes), planned set rows pre-created as
+  LOCAL drafts (nothing hits the server until touched; + Add Set = extras
+  only), /sessions/:id in logged order + time-of-day, finish-sheet View
+  workout + notes box, done day cards link to the workout ("Start again").
+  (3) Unilateral: exercises.laterality ('bilateral'|'unilateral', catalog
+  column, libconsole select), workout_sets.weight_left/right — one row = one
+  L+R pair = ONE set, canonical weight = min(L,R) (weak side drives double
+  progression); set counts everywhere stay pair-based; CSV/JSON exports carry
+  L/R + session_id + local dates. (4) Per-exercise notes:
+  workout_exercise_notes (PK session+exercise, dated), PUT
+  /v1/sessions/:id/exercises/:exid/note, editable in the logger, last 2 shown
+  dated under "Last time" (equipment-substitution memory). (5) iOS push
+  repair: sw.js ALWAYS shows the notification (silent-skip = 3-strike
+  subscription revocation on iOS), permission prompt before any await,
+  pushsubscriptionchange + startup health check, Declarative Web Push payload
+  (web_push 8030), rest alarm rides POST /v1/sets rest_ends_at (offline-safe),
+  server logs schedule/fire/send status, POST /v1/me/push-test + Settings
+  "Send test notification", /v1/push/public-key returns subscribed. (6) Rest
+  timer: Settings duration control (Off/1:30/2:00/3:00, localStorage
+  restTimerSeconds), un-record cancels timer, Go! banner auto-dismisses.
+  (7) Dashboard truth: SETS tile counts actual recorded sets, workouts =
+  distinct days, Up next = first not-done day. (8) Guards: delete-recorded
+  confirm, Discard workout, mid-workout start guard, edit mode ("Done
+  editing", no re-celebration), template-builder dirty/preset/empty-publish
+  guards, /workout dead-end has Back to Today. Exercise line-art fully
+  removed. e2e: 36 tests incl. e2e/bench-features.spec.js. NOTE: seed.sql
+  re-applies the laterality backfill for fresh envs (migration runs before
+  seed).
 
 ### Next up
 

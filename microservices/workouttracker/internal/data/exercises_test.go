@@ -13,9 +13,9 @@ func TestExerciseReaderGetReturnsExerciseWithTargets(t *testing.T) {
 			sqlContains: "FROM exercises e LEFT JOIN movement_patterns mp ON e.movement_pattern_id = mp.id WHERE e.id = $1",
 			args:        []driver.Value{int64(31)},
 			rows: &stubRows{
-				columns: []string{"id", "name", "type", "movement_pattern_id", "name"},
+				columns: []string{"id", "name", "type", "laterality", "movement_pattern_id", "name"},
 				values: [][]driver.Value{
-					{int64(31), "Machine Incline Chest Press", "compound", int64(9), "horizontal press"},
+					{int64(31), "Machine Incline Chest Press", "compound", "bilateral", int64(9), "horizontal press"},
 				},
 			},
 		},
@@ -60,7 +60,7 @@ func TestExerciseReaderGetReturnsNotFound(t *testing.T) {
 			sqlContains: "FROM exercises e LEFT JOIN movement_patterns mp ON e.movement_pattern_id = mp.id WHERE e.id = $1",
 			args:        []driver.Value{int64(999)},
 			rows: &stubRows{
-				columns: []string{"id", "name", "type", "movement_pattern_id", "name"},
+				columns: []string{"id", "name", "type", "laterality", "movement_pattern_id", "name"},
 			},
 		},
 	)

@@ -1,8 +1,10 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
+import History from './pages/History'
 import CreateMesocycle from './pages/CreateMesocycle'
 import SetupDayExercises from './pages/SetupDayExercises'
 import Workout from './features/workout/WorkoutSession'
@@ -19,6 +21,17 @@ import AppLayout from './components/layout/AppLayout'
 import FocusLayout from './components/layout/FocusLayout'
 import { ToastProvider } from './components/ui/Toast'
 import { isTokenValid, clearSession, isAdmin } from './auth/session'
+
+// Navigating to a new page must land at the top — without this, a tap on a
+// long list carries the old scroll position into the next route and can open
+// a detail page on a blank viewport.
+function ScrollToTop() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
+  return null
+}
 
 function ProtectedRoute({ children }) {
   if (!isTokenValid()) {
@@ -38,6 +51,7 @@ function AdminRoute({ children }) {
 export default function App() {
   return (
     <ToastProvider>
+    <ScrollToTop />
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -46,6 +60,7 @@ export default function App() {
       {/* Tab destinations share the app chrome (top bar + bottom nav) */}
       <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/history" element={<History />} />
         <Route path="/programs" element={<Navigate to="/programs/history" replace />} />
         <Route path="/programs/new" element={<CreateMesocycle />} />
         <Route path="/programs/templates" element={<Templates />} />

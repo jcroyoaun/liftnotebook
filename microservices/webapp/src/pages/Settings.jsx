@@ -1,8 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { getUser, clearSession, isAdmin } from '../auth/session'
-import { isPushSupported, restAlarmEnabled, enableRestAlarm, disableRestAlarm } from '../lib/push'
+import {
+  isPushSupported,
+  restAlarmEnabled,
+  enableRestAlarm,
+  disableRestAlarm,
+  prefetchPushKey,
+  checkPushHealth,
+  getPushStatus,
+} from '../lib/push'
+import { REST_OPTIONS, getRestSeconds, setRestSeconds } from '../lib/restPrefs'
 import Card from '../components/ui/Card'
 import PageHeader from '../components/ui/PageHeader'
 import BottomSheet from '../components/ui/BottomSheet'
@@ -83,7 +92,7 @@ function ChangePasswordSheet({ open, onClose }) {
           minLength={8}
         />
         <Button type="submit" disabled={loading} className="w-full min-h-12">
-          {loading ? 'Updating...' : 'Update Password'}
+          {loading ? 'Updating...' : 'Update password'}
         </Button>
       </form>
     </BottomSheet>
@@ -98,7 +107,38 @@ export default function Settings() {
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [alarmOn, setAlarmOn] = useState(() => restAlarmEnabled())
   const [alarmBusy, setAlarmBusy] = useState(false)
+  const [testBusy, setTestBusy] = useState(false)
+  const [serverSubscribed, setServerSubscribed] = useState(
+    () => getPushStatus().subscribedOnServer === true,
+  )
+  const [restSeconds, setRestSecondsState] = useState(() => getRestSeconds())
   const showToast = useToast()
+
+  const pushSupported = isPushSupported()
+  const showInstallHint =
+    !pushSupported &&
+    /iPhone|iPad/.test(navigator.userAgent) &&
+    (navigator.standalone === false || !window.matchMedia('(display-mode: standalone)').matches)
+  const restSelected = restSeconds === null ? 'off' : restSeconds
+
+  // Prefetch the VAPID key (instant subscribe on toggle) and reconcile the
+  // toggle with reality — iOS revokes subscriptions silently.
+  useEffect(() => {
+    let cancelled = false
+    prefetchPushKey().then((res) => {
+      if (!cancelled && res) setServerSubscribed(res.subscribed)
+    })
+    checkPushHealth().then((health) => {
+      if (cancelled) return
+      if (health === 'revoked' || health === 'permission-lost') {
+        setAlarmOn(false)
+        showToast('iOS turned the rest alarm off — flip it back on to re-enable.')
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [showToast])
 
   async function toggleAlarm() {
     setAlarmBusy(true)
@@ -110,6 +150,7 @@ export default function Settings() {
       } else {
         await enableRestAlarm()
         setAlarmOn(true)
+        setServerSubscribed(true)
         showToast('Rest alarm on — pocket your phone, we buzz you', 'success')
       }
     } catch (err) {
@@ -117,6 +158,23 @@ export default function Settings() {
     } finally {
       setAlarmBusy(false)
     }
+  }
+
+  async function sendTest() {
+    setTestBusy(true)
+    try {
+      await api.sendTestPush()
+      showToast('Test sent — lock your phone and watch for it.', 'success')
+    } catch (err) {
+      showToast(err.message)
+    } finally {
+      setTestBusy(false)
+    }
+  }
+
+  function pickRest(value) {
+    setRestSeconds(value)
+    setRestSecondsState(value === 'off' ? null : value)
   }
 
   function logout() {
@@ -197,31 +255,74 @@ export default function Settings() {
           <span className="text-sm text-ink">Password</span>
           <span className="text-sm font-medium text-accent">Change</span>
         </button>
-        <div className="flex min-h-12 items-center justify-between gap-3 px-4 py-3">
-          <div className="min-w-0">
-            <div className="text-sm text-ink">Rest alarm</div>
-            <div className="text-[13px] text-ink-3">
-              {isPushSupported()
-                ? 'Notification when rest ends, even with the screen off'
-                : 'Not supported here — on iPhone, install the app first'}
-            </div>
+        <div className="px-4 py-3">
+          <div className="text-sm text-ink">Rest timer</div>
+          <div className="mb-2.5 text-[13px] text-ink-3">Starts after every logged set.</div>
+          <div className="grid grid-cols-4 gap-1 rounded-btn bg-sunken p-1" role="radiogroup" aria-label="Rest timer">
+            {REST_OPTIONS.map(opt => (
+              <button
+                key={String(opt.value)}
+                role="radio"
+                aria-checked={restSelected === opt.value}
+                onClick={() => pickRest(opt.value)}
+                className={`min-h-10 rounded-[8px] text-sm transition-all active:scale-[0.97] ${
+                  restSelected === opt.value
+                    ? 'bg-card font-semibold text-ink shadow-card'
+                    : 'font-medium text-ink-3 hover:text-ink-2'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
+        </div>
+        <div>
           <button
             role="switch"
             aria-checked={alarmOn}
             aria-label="Rest alarm notifications"
-            disabled={alarmBusy || !isPushSupported()}
+            disabled={alarmBusy || !pushSupported}
             onClick={toggleAlarm}
-            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
-              alarmOn ? 'bg-accent-solid' : 'bg-line-2'
-            }`}
+            className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors active:bg-sunken disabled:opacity-50"
           >
+            <span className="min-w-0">
+              <span className="block text-sm text-ink">Rest alarm</span>
+              <span className="block text-[13px] text-ink-3">
+                {pushSupported
+                  ? 'Notification when rest ends, even with the screen off'
+                  : 'Not supported here — on iPhone, install the app first'}
+              </span>
+            </span>
             <span
-              className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-card transition-all ${
-                alarmOn ? 'left-[22px]' : 'left-0.5'
+              aria-hidden="true"
+              className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+                alarmOn ? 'bg-accent-solid' : 'bg-line-2'
               }`}
-            />
+            >
+              <span
+                className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-card transition-all ${
+                  alarmOn ? 'left-[22px]' : 'left-0.5'
+                }`}
+              />
+            </span>
           </button>
+          {showInstallHint && (
+            <p className="px-4 pb-3 text-sm text-ink-3">
+              On iPhone: install the app first — Share → Add to Home Screen — then enable this.
+            </p>
+          )}
+          {(alarmOn || serverSubscribed) && (
+            <div className="px-4 pb-3">
+              <Button
+                variant="secondary"
+                onClick={sendTest}
+                disabled={testBusy}
+                className="w-full"
+              >
+                Send test notification
+              </Button>
+            </div>
+          )}
         </div>
         <div className="flex min-h-12 items-center justify-between px-4 py-3">
           <span className="text-sm text-ink">Units</span>

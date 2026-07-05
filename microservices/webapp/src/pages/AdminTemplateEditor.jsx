@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import ExerciseDetailButton from '../components/ExerciseDetailButton'
-import ExerciseArt from '../components/ExerciseArt'
 import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
+import ConfirmSheet from '../components/ui/ConfirmSheet'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useToast } from '../lib/toastContext'
 
@@ -33,6 +33,11 @@ export default function AdminTemplateEditor() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(editing)
   const [saving, setSaving] = useState(false)
+  // Guard against losing authoring work: any edit after load flips dirty,
+  // and leaving (Back link or Cancel) asks before discarding.
+  const [dirty, setDirty] = useState(false)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
+  const [pendingPreset, setPendingPreset] = useState(null)
   const navigate = useNavigate()
   const toast = useToast()
 
@@ -72,15 +77,35 @@ export default function AdminTemplateEditor() {
       return next.slice(0, n)
     })
     setActiveDay(a => Math.min(a, n - 1))
+    setDirty(true)
   }
 
   function applyPreset(p) {
     setDays(p.days.map((label, i) => ({ day_number: i + 1, label, exercises: [] })))
     setActiveDay(0)
+    setDirty(true)
+  }
+
+  // Presets wipe every day: once real exercises exist, confirm first.
+  function requestPreset(p) {
+    if (days.some(d => d.exercises.length > 0)) {
+      setPendingPreset(p)
+    } else {
+      applyPreset(p)
+    }
+  }
+
+  function requestLeave() {
+    if (dirty) {
+      setConfirmDiscard(true)
+    } else {
+      navigate('/admin/templates')
+    }
   }
 
   function updateDay(idx, patch) {
     setDays(prev => prev.map((d, i) => (i === idx ? { ...d, ...patch } : d)))
+    setDirty(true)
   }
 
   function addExercise(ex) {
@@ -156,25 +181,49 @@ export default function AdminTemplateEditor() {
 
   const day = days[activeDay]
   const selectedIds = new Set(day.exercises.map(e => e.exercise_id))
-  const filtered = allExercises.filter(e =>
-    !selectedIds.has(e.id) && e.name.toLowerCase().includes(search.toLowerCase())
-  )
-  const canSave = name.trim() !== '' && days.every(d => d.label.trim() !== '')
+  // Prefix matches outrank substring matches so "tricep" surfaces the
+  // Tricep... variants before every ...Triceps Pushdown lookalike.
+  const q = search.trim().toLowerCase()
+  const filtered = allExercises
+    .filter(e => !selectedIds.has(e.id) && e.name.toLowerCase().includes(q))
+    .sort((a, b) =>
+      (a.name.toLowerCase().startsWith(q) ? 0 : 1) - (b.name.toLowerCase().startsWith(q) ? 0 : 1)
+    )
+  const firstEmptyDay = days.findIndex(d => d.exercises.length === 0)
+  const canSave =
+    name.trim() !== '' && days.every(d => d.label.trim() !== '') && firstEmptyDay === -1
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title={editing ? 'Edit template' : 'New template'}
-        subtitle="Published to everyone's template browser"
-        backTo="/admin/templates"
-      />
+      {/* Intercept the Back link while dirty so edits aren't lost silently. */}
+      <div
+        onClickCapture={e => {
+          if (!dirty) return
+          if (e.target.closest?.('a')) {
+            e.preventDefault()
+            e.stopPropagation()
+            setConfirmDiscard(true)
+          }
+        }}
+      >
+        <PageHeader
+          title={editing ? 'Edit template' : 'New template'}
+          subtitle="Published to everyone's template browser"
+          backTo="/admin/templates"
+        />
+        {editing && (
+          <p className="mt-1.5 text-[13px] text-ink-3">
+            Changes apply to new starts — blocks already running keep their copy.
+          </p>
+        )}
+      </div>
 
       <div className="space-y-4 rounded-card border border-line bg-card p-4 shadow-card">
         <Input
           label="Template name"
           type="text"
           value={name}
-          onChange={e => setName(e.target.value)}
+          onChange={e => { setName(e.target.value); setDirty(true) }}
           required
           placeholder="e.g., House PPL"
         />
@@ -182,7 +231,7 @@ export default function AdminTemplateEditor() {
           <label className="mb-1.5 block text-sm font-medium text-ink-2">Description</label>
           <textarea
             value={description}
-            onChange={e => setDescription(e.target.value)}
+            onChange={e => { setDescription(e.target.value); setDirty(true) }}
             rows={2}
             placeholder="Who it's for, how to run it"
             className="w-full rounded-field border border-line-2 bg-raised px-3 py-2.5 text-[15px] text-ink placeholder:text-ink-4 transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
@@ -195,7 +244,7 @@ export default function AdminTemplateEditor() {
               <button
                 key={p.label}
                 type="button"
-                onClick={() => applyPreset(p)}
+                onClick={() => requestPreset(p)}
                 className="min-h-10 rounded-full border border-line-2 bg-card px-3.5 py-2 text-xs font-medium text-ink-2 transition-all active:scale-[0.97] active:bg-sunken"
               >
                 {p.label}
@@ -250,6 +299,7 @@ export default function AdminTemplateEditor() {
             type="text"
             value={day.label}
             onChange={e => updateDay(activeDay, { label: e.target.value })}
+            onFocus={e => e.target.select()}
             required
             placeholder={`Day ${activeDay + 1}`}
             className="flex-1"
@@ -313,10 +363,9 @@ export default function AdminTemplateEditor() {
                 <button
                   key={ex.id}
                   onClick={() => addExercise(ex)}
-                  className="flex min-h-11 w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-ink transition-colors hover:bg-wash active:bg-wash"
+                  className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-wash active:bg-wash"
                 >
-                  <ExerciseArt exerciseId={ex.id} className="h-9 w-9 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{ex.name}</span>
+                  <span className="min-w-0 flex-1 line-clamp-2">{ex.name}</span>
                   <span className="shrink-0 text-xs text-ink-4">{ex.movement_pattern}</span>
                 </button>
               ))}
@@ -325,14 +374,39 @@ export default function AdminTemplateEditor() {
         </div>
       </div>
 
-      <div className="flex gap-2">
-        <Button variant="secondary" onClick={() => navigate('/admin/templates')} className="min-h-12 px-5">
-          Cancel
-        </Button>
-        <Button onClick={save} disabled={saving || !canSave} className="min-h-12 flex-1">
-          {saving ? 'Saving…' : editing ? 'Save changes' : 'Publish template'}
-        </Button>
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={requestLeave} className="min-h-12 px-5">
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={saving || !canSave} className="min-h-12 flex-1">
+            {saving ? 'Saving…' : editing ? 'Save changes' : 'Publish template'}
+          </Button>
+        </div>
+        {firstEmptyDay !== -1 && (
+          <p className="text-center text-[13px] text-ink-3">
+            Day {firstEmptyDay + 1} has no exercises yet.
+          </p>
+        )}
       </div>
+
+      <ConfirmSheet
+        open={confirmDiscard}
+        title="Discard this template?"
+        body="Your edits here will be lost."
+        confirmLabel="Discard"
+        onConfirm={() => navigate('/admin/templates')}
+        onClose={() => setConfirmDiscard(false)}
+      />
+
+      <ConfirmSheet
+        open={!!pendingPreset}
+        title="Apply preset?"
+        body="This replaces your current days and exercises."
+        confirmLabel="Replace"
+        onConfirm={() => applyPreset(pendingPreset)}
+        onClose={() => setPendingPreset(null)}
+      />
     </div>
   )
 }

@@ -15,10 +15,10 @@ func TestGetForMesocycleScopesToOwnerAndJoinsNames(t *testing.T) {
 			sqlContains: "JOIN workout_sessions sess ON ws.workout_session_id = sess.id WHERE sess.user_id = $1 AND sess.mesocycle_id = $2",
 			args:        []driver.Value{int64(7), int64(3)},
 			rows: &stubRows{
-				columns: []string{"id", "workout_session_id", "exercise_id", "name", "set_number", "weight", "reps", "rir", "recorded", "client_id", "created_at", "version"},
+				columns: []string{"id", "workout_session_id", "exercise_id", "name", "set_number", "weight", "weight_left", "weight_right", "reps", "rir", "recorded", "client_id", "created_at", "version"},
 				values: [][]driver.Value{
-					{int64(1), int64(10), int64(11), "Flat Barbell Bench Press", int64(1), 100.0, int64(8), int64(0), true, nil, now, int64(1)},
-					{int64(2), int64(10), int64(11), "Flat Barbell Bench Press", int64(2), 100.0, int64(7), int64(0), true, nil, now, int64(1)},
+					{int64(1), int64(10), int64(11), "Flat Barbell Bench Press", int64(1), 100.0, nil, nil, int64(8), int64(0), true, nil, now, int64(1)},
+					{int64(2), int64(10), int64(11), "Flat Barbell Bench Press", int64(2), 100.0, nil, nil, int64(7), int64(0), true, nil, now, int64(1)},
 				},
 			},
 		},

@@ -35,7 +35,8 @@ export default function AdminUsers() {
       await navigator.clipboard.writeText(link)
       toast('Invite link copied', 'success')
     } catch {
-      toast('Could not copy — grab it from Settings instead')
+      // The raw code is rendered in the card, so a failed copy is recoverable.
+      toast(inviteCode ? 'Could not copy — the code is shown above.' : 'Could not copy the link.')
     }
   }
 
@@ -77,14 +78,21 @@ export default function AdminUsers() {
       <PageHeader title="Members" subtitle="Everyone training here" backTo="/settings" />
 
       {inviteCode !== null && (
-        <div className="flex items-center justify-between gap-3 rounded-card border border-line bg-card p-4 shadow-card">
-          <div className="min-w-0">
+        <div className="space-y-3 rounded-card border border-line bg-card p-4 shadow-card">
+          <div>
             <div className="text-sm font-semibold text-ink">Invite a friend</div>
             <div className="text-[13px] text-ink-3">
               One link — invite code comes prefilled, they just pick a password.
             </div>
           </div>
-          <Button variant="secondary" onClick={copyInviteLink} className="shrink-0">
+          {inviteCode !== '' && (
+            <div className="rounded-field border border-line bg-sunken px-3 py-2.5 text-center">
+              <div className="select-all break-all font-mono text-sm font-semibold tracking-wider text-ink">
+                {inviteCode}
+              </div>
+            </div>
+          )}
+          <Button variant="secondary" onClick={copyInviteLink} className="w-full">
             Copy link
           </Button>
         </div>

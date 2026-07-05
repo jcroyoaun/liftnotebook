@@ -20,6 +20,17 @@ type LastPerformance struct {
 	PerformedAt time.Time `json:"performed_at"`
 }
 
+// LastSet is one recorded set from the most recent session containing an
+// exercise — the per-set-slot "last time" ghost for the logger.
+type LastSet struct {
+	SetNumber   int      `json:"set_number"`
+	Weight      float64  `json:"weight"`
+	WeightLeft  *float64 `json:"weight_left"`
+	WeightRight *float64 `json:"weight_right"`
+	Reps        int      `json:"reps"`
+	RIR         *int     `json:"rir"`
+}
+
 // Suggestion is a computed next-session target for one exercise. It is never
 // stored — always derived at read time from the latest recorded sets.
 type Suggestion struct {
@@ -34,6 +45,12 @@ type Suggestion struct {
 	SuggestedReps         int              `json:"suggested_reps"`
 	Reason                string           `json:"reason"`
 	LastPerformance       *LastPerformance `json:"last_performance,omitempty"`
+	// LastSets holds every recorded set of the most recent session
+	// containing this exercise, in set order; LastPerformedAt is that
+	// session's date. LastPerformance (single best set) stays for compat.
+	LastSets        []LastSet            `json:"last_sets,omitempty"`
+	LastPerformedAt *time.Time           `json:"last_performed_at,omitempty"`
+	LastNotes       []RecentExerciseNote `json:"last_notes,omitempty"`
 }
 
 // SuggestNextSet implements double progression tuned for to-failure
@@ -55,7 +72,7 @@ func SuggestNextSet(last *LastPerformance, target TrainingExercise) Suggestion {
 	if last == nil {
 		s.SuggestedWeight = 0
 		s.SuggestedReps = target.TargetRepRangeLow
-		s.Reason = "first exposure: pick a weight you can take to failure inside the rep range"
+		s.Reason = "first time here — pick a weight you can just take to failure"
 		return s
 	}
 
@@ -65,11 +82,11 @@ func SuggestNextSet(last *LastPerformance, target TrainingExercise) Suggestion {
 	case last.Reps >= target.TargetRepRangeHigh && intensityMet:
 		s.SuggestedWeight = last.Weight + WeightIncrementKg
 		s.SuggestedReps = target.TargetRepRangeLow
-		s.Reason = "topped the rep range at target intensity: add weight"
+		s.Reason = "reps topped out at full effort — add weight"
 	case last.Reps < target.TargetRepRangeLow:
 		s.SuggestedWeight = last.Weight
 		s.SuggestedReps = target.TargetRepRangeLow
-		s.Reason = "below the rep range: stay at this weight until the bottom of the range is reached"
+		s.Reason = "reps dipped — stay at this weight and build them back"
 	default:
 		s.SuggestedWeight = last.Weight
 		s.SuggestedReps = min(last.Reps+1, target.TargetRepRangeHigh)
@@ -109,13 +126,28 @@ func (m ProgressionModel) GetSuggestionsForTrainingDay(userID, trainingDayID int
 		return nil, err
 	}
 
+	notes := ExerciseNoteModel{DB: m.DB}
+
 	suggestions := make([]Suggestion, 0, len(exercises))
 	for _, te := range exercises {
 		last, err := m.getLastPerformance(ctx, userID, te.ExerciseID)
 		if err != nil {
 			return nil, err
 		}
-		suggestions = append(suggestions, SuggestNextSet(last, te))
+
+		s := SuggestNextSet(last, te)
+
+		s.LastSets, s.LastPerformedAt, err = m.getLastSets(ctx, userID, te.ExerciseID)
+		if err != nil {
+			return nil, err
+		}
+
+		s.LastNotes, err = notes.GetRecentForExercise(userID, te.ExerciseID, 2)
+		if err != nil {
+			return nil, err
+		}
+
+		suggestions = append(suggestions, s)
 	}
 
 	return suggestions, nil
@@ -170,4 +202,44 @@ func (m ProgressionModel) getLastPerformance(ctx context.Context, userID, exerci
 		return nil, err
 	}
 	return &lp, nil
+}
+
+// getLastSets returns every recorded set (in set order) of the user's most
+// recent session containing the exercise, plus that session's date — the
+// full "what did I actually do last time" record, not just the best set.
+func (m ProgressionModel) getLastSets(ctx context.Context, userID, exerciseID int64) ([]LastSet, *time.Time, error) {
+	query := `
+		SELECT wset.set_number, wset.weight, wset.weight_left, wset.weight_right, wset.reps, wset.rir, wsess.performed_at
+		FROM workout_sets wset
+		JOIN workout_sessions wsess ON wset.workout_session_id = wsess.id
+		WHERE wsess.user_id = $1 AND wset.exercise_id = $2 AND wset.recorded = true
+		  AND wset.workout_session_id = (
+			SELECT ws2.workout_session_id
+			FROM workout_sets ws2
+			JOIN workout_sessions sess2 ON ws2.workout_session_id = sess2.id
+			WHERE sess2.user_id = $1 AND ws2.exercise_id = $2 AND ws2.recorded = true
+			ORDER BY sess2.performed_at DESC, sess2.id DESC
+			LIMIT 1
+		  )
+		ORDER BY wset.set_number`
+
+	rows, err := m.DB.QueryContext(ctx, query, userID, exerciseID)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	var sets []LastSet
+	var performedAt *time.Time
+	for rows.Next() {
+		var s LastSet
+		var at time.Time
+		err := rows.Scan(&s.SetNumber, &s.Weight, &s.WeightLeft, &s.WeightRight, &s.Reps, &s.RIR, &at)
+		if err != nil {
+			return nil, nil, err
+		}
+		sets = append(sets, s)
+		performedAt = &at
+	}
+	return sets, performedAt, rows.Err()
 }

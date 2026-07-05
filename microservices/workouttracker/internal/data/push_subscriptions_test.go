@@ -60,6 +60,32 @@ func TestPushSubscriptionGetForUser(t *testing.T) {
 	stub.assertExhausted(t)
 }
 
+func TestPushSubscriptionHasForUser(t *testing.T) {
+	db, stub := newStubDB(t,
+		stubExpectation{
+			op:          "query",
+			sqlContains: "SELECT EXISTS(SELECT 1 FROM push_subscriptions WHERE user_id = $1)",
+			args:        []driver.Value{int64(7)},
+			rows: &stubRows{
+				columns: []string{"exists"},
+				values:  [][]driver.Value{{true}},
+			},
+		},
+	)
+
+	model := PushSubscriptionModel{DB: db}
+
+	has, err := model.HasForUser(7)
+	if err != nil {
+		t.Fatalf("HasForUser: %v", err)
+	}
+	if !has {
+		t.Error("has = false, want true")
+	}
+
+	stub.assertExhausted(t)
+}
+
 func TestPushSubscriptionDeleteScopedToUser(t *testing.T) {
 	db, stub := newStubDB(t,
 		stubExpectation{

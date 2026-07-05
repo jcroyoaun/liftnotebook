@@ -244,7 +244,7 @@ test.describe.serial('Full User Journey', () => {
     await loginAndGo(page, '/')
 
     const pushDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 1: Push' })
-    await pushDay.locator('button:has-text("Start Workout")').first().click()
+    await pushDay.locator('button:has-text("Start Workout"), button:has-text("Start again")').first().click()
     await page.waitForURL(/\/workout\/\d+/)
 
     // Bail without logging anything — the classic pocket-dial start.
@@ -262,7 +262,7 @@ test.describe.serial('Full User Journey', () => {
 
     // Start Push workout
     const pushDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 1: Push' })
-    await pushDay.locator('button:has-text("Start Workout")').click()
+    await pushDay.locator('button:has-text("Start Workout"), button:has-text("Start again")').click()
     await page.waitForURL(/\/workout\/\d+/)
 
     const sessionId = parseInt(page.url().match(/workout\/(\d+)/)[1])
@@ -272,7 +272,6 @@ test.describe.serial('Full User Journey', () => {
 
     await page.getByRole('button', { name: 'Flat Barbell Bench Press', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Flat Barbell Bench Press' })).toBeVisible()
-    await expect(page.getByTestId('exercise-art').first()).toBeVisible()
     await expect(page.locator('text=Primary Muscles')).toBeVisible()
     await expect(page.locator('text=Pectoralis Major')).toBeVisible()
     await page.getByRole('button', { name: 'Close', exact: true }).click()
@@ -291,7 +290,7 @@ test.describe.serial('Full User Journey', () => {
   test('6b. Week 1 Pull workout', async ({ page }) => {
     await loginAndGo(page, '/')
     const pullDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 2: Pull' })
-    await pullDay.locator('button:has-text("Start Workout")').click()
+    await pullDay.locator('button:has-text("Start Workout"), button:has-text("Start again")').click()
     await page.waitForURL(/\/workout\/\d+/)
     const sessionId = parseInt(page.url().match(/workout\/(\d+)/)[1])
 
@@ -304,7 +303,7 @@ test.describe.serial('Full User Journey', () => {
   test('6c. Week 1 Legs workout', async ({ page }) => {
     await loginAndGo(page, '/')
     const legsDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 3: Legs' })
-    await legsDay.locator('button:has-text("Start Workout")').click()
+    await legsDay.locator('button:has-text("Start Workout"), button:has-text("Start again")').click()
     await page.waitForURL(/\/workout\/\d+/)
     const sessionId = parseInt(page.url().match(/workout\/(\d+)/)[1])
 
@@ -352,7 +351,7 @@ test.describe.serial('Full User Journey', () => {
   test('8a. Week 2 Push workout (heavier)', async ({ page }) => {
     await loginAndGo(page, '/')
     const pushDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 1: Push' })
-    await pushDay.locator('button:has-text("Start Workout")').click()
+    await pushDay.locator('button:has-text("Start Workout"), button:has-text("Start again")').click()
     await page.waitForURL(/\/workout\/\d+/)
     const sessionId = parseInt(page.url().match(/workout\/(\d+)/)[1])
 
@@ -365,7 +364,7 @@ test.describe.serial('Full User Journey', () => {
   test('8b. Week 2 Pull workout', async ({ page }) => {
     await loginAndGo(page, '/')
     const pullDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 2: Pull' })
-    await pullDay.locator('button:has-text("Start Workout")').click()
+    await pullDay.locator('button:has-text("Start Workout"), button:has-text("Start again")').click()
     await page.waitForURL(/\/workout\/\d+/)
     const sessionId = parseInt(page.url().match(/workout\/(\d+)/)[1])
 
@@ -378,7 +377,7 @@ test.describe.serial('Full User Journey', () => {
   test('8c. Week 2 Legs workout', async ({ page }) => {
     await loginAndGo(page, '/')
     const legsDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 3: Legs' })
-    await legsDay.locator('button:has-text("Start Workout")').click()
+    await legsDay.locator('button:has-text("Start Workout"), button:has-text("Start again")').click()
     await page.waitForURL(/\/workout\/\d+/)
     const sessionId = parseInt(page.url().match(/workout\/(\d+)/)[1])
 
@@ -421,7 +420,7 @@ test.describe.serial('Full User Journey', () => {
 
     await loginAndGo(page, '/')
     const pushDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 1: Push' })
-    await pushDay.locator('button:has-text("Start Workout")').click()
+    await pushDay.locator('button:has-text("Start Workout"), button:has-text("Start again")').click()
     await page.waitForURL(/\/workout\/\d+/)
     const sessionId = parseInt(page.url().match(/workout\/(\d+)/)[1])
 
@@ -494,7 +493,7 @@ test.describe.serial('Full User Journey', () => {
 
     const fs = await import('node:fs')
     const content = fs.readFileSync(await csv.path(), 'utf8')
-    expect(content).toContain('date,day_label,exercise,set_number,weight_kg,reps,rir,recorded')
+    expect(content).toContain('date,time,session_id,day_label,exercise,set_number,weight_kg,weight_left_kg,weight_right_kg,reps,rir,recorded')
     expect(content).toContain('Flat Barbell Bench Press')
   })
 

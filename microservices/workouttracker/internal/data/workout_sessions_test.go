@@ -71,6 +71,49 @@ func TestListForMesocycleExposesRecordedSetCounts(t *testing.T) {
 	stub.assertExhausted(t)
 }
 
+func TestListForUserPaginatesAndComputesTonnage(t *testing.T) {
+	now := time.Now()
+
+	db, stub := newStubDB(t,
+		stubExpectation{
+			op:          "query",
+			sqlContains: "WHERE ws.user_id = $1 ORDER BY ws.performed_at DESC, ws.id DESC LIMIT $2 OFFSET $3",
+			args:        []driver.Value{int64(7), int64(2), int64(2)},
+			rows: &stubRows{
+				columns: []string{"count", "id", "performed_at", "label", "mesocycle_id", "name", "recorded_sets", "volume", "exercises"},
+				values: [][]driver.Value{
+					{int64(5), int64(20), now, "Upper A", int64(3), "Upper/Lower Maximalist", int64(6), 2340.0, []byte(`{"Flat Barbell Bench Press","Back Squat"}`)},
+					{int64(5), int64(19), now, "Lower A", int64(2), "Old Block", int64(0), 0.0, []byte(`{}`)},
+				},
+			},
+		},
+	)
+
+	model := WorkoutSessionModel{DB: db}
+
+	sessions, total, err := model.ListForUser(7, 2, 2)
+	if err != nil {
+		t.Fatalf("ListForUser: %v", err)
+	}
+	if total != 5 {
+		t.Errorf("total = %d, want 5", total)
+	}
+	if len(sessions) != 2 {
+		t.Fatalf("len = %d, want 2", len(sessions))
+	}
+	if sessions[0].MesocycleName != "Upper/Lower Maximalist" || sessions[0].TotalVolumeKg != 2340 {
+		t.Errorf("unexpected first summary %+v", sessions[0])
+	}
+	if len(sessions[0].Exercises) != 2 || sessions[0].Exercises[0] != "Flat Barbell Bench Press" {
+		t.Errorf("exercises = %v, want first-set order preserved", sessions[0].Exercises)
+	}
+	if sessions[1].Exercises == nil || len(sessions[1].Exercises) != 0 {
+		t.Errorf("empty session exercises = %#v, want empty non-nil slice", sessions[1].Exercises)
+	}
+
+	stub.assertExhausted(t)
+}
+
 func TestWorkoutSessionDeleteReturnsNotFoundForForeignSession(t *testing.T) {
 	db, stub := newStubDB(t,
 		stubExpectation{

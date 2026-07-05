@@ -43,6 +43,9 @@ type config struct {
 		publicKey  string
 		privateKey string
 	}
+	// appURL is where push notifications navigate on tap (Declarative Web
+	// Push requires it in the payload).
+	appURL string
 }
 
 type application struct {
@@ -65,6 +68,11 @@ func main() {
 	flag.StringVar(&cfg.inviteCode, "invite-code", os.Getenv("INVITE_CODE"), "Invite code required for registration (empty = open registration)")
 	flag.StringVar(&cfg.vapid.publicKey, "vapid-public-key", os.Getenv("VAPID_PUBLIC_KEY"), "VAPID public key for web push (empty = push disabled)")
 	flag.StringVar(&cfg.vapid.privateKey, "vapid-private-key", os.Getenv("VAPID_PRIVATE_KEY"), "VAPID private key for web push (empty = push disabled)")
+	appURLDefault := os.Getenv("APP_URL")
+	if appURLDefault == "" {
+		appURLDefault = "https://liftnotebook.app"
+	}
+	flag.StringVar(&cfg.appURL, "app-url", appURLDefault, "Public webapp URL push notifications navigate to")
 	adminEmailsRaw := flag.String("admin-emails", os.Getenv("ADMIN_EMAILS"), "Comma-separated emails promoted to the admin role at startup")
 
 	migrateOnly := flag.Bool("migrate-only", false, "Run database migrations and exit")
@@ -158,4 +166,3 @@ func openDB(cfg config) (*sql.DB, error) {
 
 	return db, nil
 }
-

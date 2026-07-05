@@ -25,18 +25,38 @@ export function toProgramCSV(exp) {
   return csv(rows)
 }
 
-// One row per logged set, oldest session first.
+// Local calendar date + time: an evening lift west of UTC must not export
+// as tomorrow's date (it reads as corrupted data next to the app's display).
+function localDate(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+function localTime(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const p = (n) => String(n).padStart(2, '0')
+  return `${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+// One row per logged set, oldest session first. session_id keeps same-day
+// sessions separable after any spreadsheet sort; weight_left/right_kg are
+// filled for unilateral pairs (weight_kg then holds min(L,R), the canonical
+// progression weight).
 export function toHistoryCSV(exp) {
-  const rows = [['date', 'day_label', 'exercise', 'set_number', 'weight_kg', 'reps', 'rir', 'recorded']]
+  const rows = [['date', 'time', 'session_id', 'day_label', 'exercise', 'set_number', 'weight_kg', 'weight_left_kg', 'weight_right_kg', 'reps', 'rir', 'recorded']]
   const sessions = [...(exp.sessions || [])].sort(
     (a, b) => new Date(a.performed_at) - new Date(b.performed_at)
   )
   for (const sess of sessions) {
-    const date = (sess.performed_at || '').slice(0, 10)
+    const sessionId = sess.id
+    const performedAt = sess.performed_at
     for (const set of sess.sets || []) {
       rows.push([
-        date, sess.day_label, set.exercise_name, set.set_number,
-        set.weight, set.reps, set.rir ?? '', set.recorded,
+        localDate(performedAt), localTime(performedAt), sessionId, sess.day_label, set.exercise_name, set.set_number,
+        set.weight, set.weight_left ?? '', set.weight_right ?? '', set.reps, set.rir ?? '', set.recorded,
       ])
     }
   }

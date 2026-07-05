@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { api } from '../api/client'
 import ExerciseDetailButton from '../components/ExerciseDetailButton'
-import ExerciseArt from '../components/ExerciseArt'
 import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
+import ConfirmSheet from '../components/ui/ConfirmSheet'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useToast } from '../lib/toastContext'
 
@@ -20,6 +20,10 @@ export default function SetupDayExercises() {
   const [saving, setSaving] = useState(false)
   const [dayVolume, setDayVolume] = useState([])
   const [weekVolume, setWeekVolume] = useState([])
+  // Exercises added here live only in local state until Save — leaving
+  // without saving silently drops them, so Cancel confirms first.
+  const [dirty, setDirty] = useState(false)
+  const [confirmLeave, setConfirmLeave] = useState(false)
   const navigate = useNavigate()
   const toast = useToast()
 
@@ -28,6 +32,7 @@ export default function SetupDayExercises() {
     setExercises([])
     setDayVolume([])
     setWeekVolume([])
+    setDirty(false)
     Promise.all([api.getExercises(), api.getMesocycle(mesoId)])
       .then(([exData, mesoData]) => {
         setAllExercises(exData.exercises || [])
@@ -91,14 +96,17 @@ export default function SetupDayExercises() {
       target_rir: 0,
     }])
     setSearch('')
+    setDirty(true)
   }
 
   function removeExercise(idx) {
     setExercises(prev => prev.filter((_, i) => i !== idx))
+    setDirty(true)
   }
 
   function updateSets(idx, val) {
     setExercises(prev => prev.map((e, i) => i === idx ? { ...e, target_sets: Math.max(1, val) } : e))
+    setDirty(true)
   }
 
   async function save() {
@@ -129,9 +137,14 @@ export default function SetupDayExercises() {
   }
 
   const selectedIds = new Set(exercises.map(e => e.exercise_id))
-  const filtered = allExercises.filter(e =>
-    !selectedIds.has(e.id) && e.name.toLowerCase().includes(search.toLowerCase())
-  )
+  // Prefix matches outrank substring matches so the exact variant you typed
+  // for surfaces first.
+  const q = search.trim().toLowerCase()
+  const filtered = allExercises
+    .filter(e => !selectedIds.has(e.id) && e.name.toLowerCase().includes(q))
+    .sort((a, b) =>
+      (a.name.toLowerCase().startsWith(q) ? 0 : 1) - (b.name.toLowerCase().startsWith(q) ? 0 : 1)
+    )
 
   if (loading) {
     return (
@@ -249,9 +262,8 @@ export default function SetupDayExercises() {
             {filtered.length === 0 && <p className="p-3 text-sm text-ink-3">No matches</p>}
             {filtered.map(ex => (
               <button key={ex.id} onClick={() => addExercise(ex)}
-                className="flex min-h-11 w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-ink transition-colors hover:bg-wash active:bg-wash">
-                <ExerciseArt exerciseId={ex.id} className="h-9 w-9 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">{ex.name}</span>
+                className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-wash active:bg-wash">
+                <span className="min-w-0 flex-1 line-clamp-2">{ex.name}</span>
                 <span className="shrink-0 text-xs text-ink-4">{ex.movement_pattern}</span>
               </button>
             ))}
@@ -261,13 +273,26 @@ export default function SetupDayExercises() {
 
       {/* Action buttons */}
       <div className="flex gap-2">
-        <Button variant="secondary" onClick={() => navigate('/')} className="min-h-12 px-5">
-          Done
+        <Button
+          variant="secondary"
+          onClick={() => (dirty ? setConfirmLeave(true) : navigate('/'))}
+          className="min-h-12 px-5"
+        >
+          Cancel
         </Button>
         <Button onClick={save} disabled={saving} className="min-h-12 flex-1">
           {saving ? 'Saving…' : currentIdx < days.length - 1 ? `Save & Next (${days[currentIdx + 1]?.label})` : 'Save & Finish'}
         </Button>
       </div>
+
+      <ConfirmSheet
+        open={confirmLeave}
+        title="Leave without saving?"
+        body="Exercises you added here aren't saved yet."
+        confirmLabel="Leave"
+        onConfirm={() => navigate('/')}
+        onClose={() => setConfirmLeave(false)}
+      />
     </div>
   )
 }

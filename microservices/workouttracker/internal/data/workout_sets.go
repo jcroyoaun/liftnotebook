@@ -15,18 +15,24 @@ import (
 var uuidRX = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 type WorkoutSet struct {
-	ID               int64     `json:"id"`
-	WorkoutSessionID int64     `json:"workout_session_id"`
-	ExerciseID       int64     `json:"exercise_id"`
-	ExerciseName     string    `json:"exercise_name,omitempty"`
-	SetNumber        int       `json:"set_number"`
-	Weight           float64   `json:"weight"`
-	Reps             int       `json:"reps"`
-	RIR              *int      `json:"rir"`
-	Recorded         bool      `json:"recorded"`
-	ClientID         *string   `json:"client_id,omitempty"`
-	CreatedAt        time.Time `json:"-"`
-	Version          int32     `json:"version,omitzero"`
+	ID               int64   `json:"id"`
+	WorkoutSessionID int64   `json:"workout_session_id"`
+	ExerciseID       int64   `json:"exercise_id"`
+	ExerciseName     string  `json:"exercise_name,omitempty"`
+	SetNumber        int     `json:"set_number"`
+	Weight           float64 `json:"weight"`
+	// WeightLeft/WeightRight carry per-limb loads for unilateral exercises.
+	// Both are set together or not at all; Weight stays canonical as
+	// MIN(left, right) — the weak limb governs progression and e1RM. No
+	// omitempty: nulls must overwrite stale optimistic values client-side.
+	WeightLeft  *float64  `json:"weight_left"`
+	WeightRight *float64  `json:"weight_right"`
+	Reps        int       `json:"reps"`
+	RIR         *int      `json:"rir"`
+	Recorded    bool      `json:"recorded"`
+	ClientID    *string   `json:"client_id,omitempty"`
+	CreatedAt   time.Time `json:"-"`
+	Version     int32     `json:"version,omitzero"`
 }
 
 type WorkoutSetModel struct {
@@ -37,6 +43,13 @@ func ValidateWorkoutSet(v *validator.Validator, s *WorkoutSet) {
 	v.Check(s.ExerciseID > 0, "exercise_id", "must be a positive integer")
 	v.Check(s.SetNumber >= 1, "set_number", "must be at least 1")
 	v.Check(s.Weight >= 0, "weight", "must be zero or positive")
+	v.Check((s.WeightLeft == nil) == (s.WeightRight == nil), "weight_left", "must be provided together with weight_right")
+	if s.WeightLeft != nil {
+		v.Check(*s.WeightLeft >= 0, "weight_left", "must be zero or positive")
+	}
+	if s.WeightRight != nil {
+		v.Check(*s.WeightRight >= 0, "weight_right", "must be zero or positive")
+	}
 	v.Check(s.Reps >= 1, "reps", "must be at least 1")
 	if s.RIR != nil {
 		v.Check(*s.RIR >= 0 && *s.RIR <= 10, "rir", "must be between 0 and 10")
@@ -48,15 +61,15 @@ func ValidateWorkoutSet(v *validator.Validator, s *WorkoutSet) {
 
 func (m WorkoutSetModel) Insert(set *WorkoutSet) error {
 	query := `
-		INSERT INTO workout_sets (workout_session_id, exercise_id, set_number, weight, reps, rir, recorded)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO workout_sets (workout_session_id, exercise_id, set_number, weight, weight_left, weight_right, reps, rir, recorded)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, created_at, version`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	return m.DB.QueryRowContext(ctx, query,
-		set.WorkoutSessionID, set.ExerciseID, set.SetNumber, set.Weight, set.Reps, set.RIR, set.Recorded,
+		set.WorkoutSessionID, set.ExerciseID, set.SetNumber, set.Weight, set.WeightLeft, set.WeightRight, set.Reps, set.RIR, set.Recorded,
 	).Scan(&set.ID, &set.CreatedAt, &set.Version)
 }
 
@@ -64,12 +77,13 @@ func (m WorkoutSetModel) InsertForUser(set *WorkoutSet, userID int64) error {
 	// A replayed client_id (offline queue retry) upserts instead of
 	// duplicating the set.
 	query := `
-		INSERT INTO workout_sets (workout_session_id, exercise_id, set_number, weight, reps, rir, recorded, client_id)
-		SELECT $1, $2, $3, $4, $5, $6, $7, $8
+		INSERT INTO workout_sets (workout_session_id, exercise_id, set_number, weight, weight_left, weight_right, reps, rir, recorded, client_id)
+		SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 		FROM workout_sessions ws
-		WHERE ws.id = $1 AND ws.user_id = $9
+		WHERE ws.id = $1 AND ws.user_id = $11
 		ON CONFLICT (client_id) WHERE client_id IS NOT NULL
-		DO UPDATE SET weight = EXCLUDED.weight, reps = EXCLUDED.reps, rir = EXCLUDED.rir,
+		DO UPDATE SET weight = EXCLUDED.weight, weight_left = EXCLUDED.weight_left,
+		              weight_right = EXCLUDED.weight_right, reps = EXCLUDED.reps, rir = EXCLUDED.rir,
 		              recorded = EXCLUDED.recorded, version = workout_sets.version + 1
 		WHERE workout_sets.workout_session_id = EXCLUDED.workout_session_id
 		RETURNING id, created_at, version`
@@ -78,7 +92,7 @@ func (m WorkoutSetModel) InsertForUser(set *WorkoutSet, userID int64) error {
 	defer cancel()
 
 	err := m.DB.QueryRowContext(ctx, query,
-		set.WorkoutSessionID, set.ExerciseID, set.SetNumber, set.Weight, set.Reps, set.RIR, set.Recorded, set.ClientID, userID,
+		set.WorkoutSessionID, set.ExerciseID, set.SetNumber, set.Weight, set.WeightLeft, set.WeightRight, set.Reps, set.RIR, set.Recorded, set.ClientID, userID,
 	).Scan(&set.ID, &set.CreatedAt, &set.Version)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -93,11 +107,11 @@ func (m WorkoutSetModel) InsertForUser(set *WorkoutSet, userID int64) error {
 func (m WorkoutSetModel) GetForSession(sessionID int64) ([]WorkoutSet, error) {
 	query := `
 		SELECT ws.id, ws.workout_session_id, ws.exercise_id, e.name,
-		       ws.set_number, ws.weight, ws.reps, ws.rir, ws.recorded, ws.client_id, ws.created_at, ws.version
+		       ws.set_number, ws.weight, ws.weight_left, ws.weight_right, ws.reps, ws.rir, ws.recorded, ws.client_id, ws.created_at, ws.version
 		FROM workout_sets ws
 		JOIN exercises e ON ws.exercise_id = e.id
 		WHERE ws.workout_session_id = $1
-		ORDER BY ws.exercise_id, ws.set_number`
+		ORDER BY MIN(ws.id) OVER (PARTITION BY ws.exercise_id), ws.set_number, ws.id`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -113,7 +127,7 @@ func (m WorkoutSetModel) GetForSession(sessionID int64) ([]WorkoutSet, error) {
 		var s WorkoutSet
 		err := rows.Scan(
 			&s.ID, &s.WorkoutSessionID, &s.ExerciseID, &s.ExerciseName,
-			&s.SetNumber, &s.Weight, &s.Reps, &s.RIR, &s.Recorded, &s.ClientID, &s.CreatedAt, &s.Version,
+			&s.SetNumber, &s.Weight, &s.WeightLeft, &s.WeightRight, &s.Reps, &s.RIR, &s.Recorded, &s.ClientID, &s.CreatedAt, &s.Version,
 		)
 		if err != nil {
 			return nil, err
@@ -128,7 +142,7 @@ func (m WorkoutSetModel) GetForSession(sessionID int64) ([]WorkoutSet, error) {
 func (m WorkoutSetModel) GetForMesocycle(userID, mesocycleID int64) ([]WorkoutSet, error) {
 	query := `
 		SELECT ws.id, ws.workout_session_id, ws.exercise_id, e.name,
-		       ws.set_number, ws.weight, ws.reps, ws.rir, ws.recorded, ws.client_id, ws.created_at, ws.version
+		       ws.set_number, ws.weight, ws.weight_left, ws.weight_right, ws.reps, ws.rir, ws.recorded, ws.client_id, ws.created_at, ws.version
 		FROM workout_sets ws
 		JOIN exercises e ON ws.exercise_id = e.id
 		JOIN workout_sessions sess ON ws.workout_session_id = sess.id
@@ -149,7 +163,7 @@ func (m WorkoutSetModel) GetForMesocycle(userID, mesocycleID int64) ([]WorkoutSe
 		var s WorkoutSet
 		err := rows.Scan(
 			&s.ID, &s.WorkoutSessionID, &s.ExerciseID, &s.ExerciseName,
-			&s.SetNumber, &s.Weight, &s.Reps, &s.RIR, &s.Recorded, &s.ClientID, &s.CreatedAt, &s.Version,
+			&s.SetNumber, &s.Weight, &s.WeightLeft, &s.WeightRight, &s.Reps, &s.RIR, &s.Recorded, &s.ClientID, &s.CreatedAt, &s.Version,
 		)
 		if err != nil {
 			return nil, err
@@ -207,28 +221,28 @@ func (m WorkoutSetModel) DeleteForUser(id, userID int64) error {
 func (m WorkoutSetModel) Update(set *WorkoutSet) error {
 	query := `
 		UPDATE workout_sets
-		SET weight = $1, reps = $2, rir = $3, recorded = $4, version = version + 1
-		WHERE id = $5
+		SET weight = $1, weight_left = $2, weight_right = $3, reps = $4, rir = $5, recorded = $6, version = version + 1
+		WHERE id = $7
 		RETURNING version`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	return m.DB.QueryRowContext(ctx, query, set.Weight, set.Reps, set.RIR, set.Recorded, set.ID).Scan(&set.Version)
+	return m.DB.QueryRowContext(ctx, query, set.Weight, set.WeightLeft, set.WeightRight, set.Reps, set.RIR, set.Recorded, set.ID).Scan(&set.Version)
 }
 
 func (m WorkoutSetModel) UpdateForUser(set *WorkoutSet, userID int64) error {
 	query := `
 		UPDATE workout_sets wset
-		SET weight = $1, reps = $2, rir = $3, recorded = $4, version = wset.version + 1
+		SET weight = $1, weight_left = $2, weight_right = $3, reps = $4, rir = $5, recorded = $6, version = wset.version + 1
 		FROM workout_sessions ws
-		WHERE wset.id = $5 AND wset.workout_session_id = ws.id AND ws.user_id = $6
+		WHERE wset.id = $7 AND wset.workout_session_id = ws.id AND ws.user_id = $8
 		RETURNING wset.version`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	err := m.DB.QueryRowContext(ctx, query, set.Weight, set.Reps, set.RIR, set.Recorded, set.ID, userID).Scan(&set.Version)
+	err := m.DB.QueryRowContext(ctx, query, set.Weight, set.WeightLeft, set.WeightRight, set.Reps, set.RIR, set.Recorded, set.ID, userID).Scan(&set.Version)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrRecordNotFound

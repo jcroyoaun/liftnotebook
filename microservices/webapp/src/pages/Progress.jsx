@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import {
   ComposedChart, Area, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, LabelList,
@@ -24,14 +25,32 @@ function E1RMTooltip({ active, payload }) {
   )
 }
 
-// Direct label on the endpoint only — the current e1RM is the headline.
-function LastPointLabel({ x, y, index, value, count, fill }) {
-  if (index !== count - 1) return null
+// Direct labels. The endpoint (current e1RM) is always the headline; short
+// series (≤8 points) label every point so the chart reads without tooltips —
+// Recharts tooltips don't open on tap.
+function PointLabel({ x, y, index, value, count, fill, mutedFill }) {
+  const isLast = index === count - 1
+  if (!isLast && count > 8) return null
   return (
-    <text x={x} y={y - 12} textAnchor="end" fontSize={12} fontWeight={600} fill={fill}>
-      {Math.round(value)} kg
+    <text
+      x={x}
+      y={y - 12}
+      textAnchor={isLast ? 'end' : index === 0 ? 'start' : 'middle'}
+      fontSize={isLast ? 12 : 11}
+      fontWeight={isLast ? 600 : 500}
+      fill={isLast ? fill : mutedFill}
+    >
+      {Math.round(value)}{isLast ? ' kg' : ''}
     </text>
   )
+}
+
+// week_start is a date-only fact ('2026-06-29T00:00:00Z'); new Date() on the
+// full string shifts it a day for UTC-negative users. Build a local date from
+// the y/m/d instead so the label reads the actual Monday.
+function parseDateOnly(s) {
+  const [y, m, d] = String(s).slice(0, 10).split('-').map(Number)
+  return new Date(y, m - 1, d)
 }
 
 function VolumeTooltip({ active, payload }) {
@@ -40,7 +59,7 @@ function VolumeTooltip({ active, payload }) {
   return (
     <div className="rounded-lg border border-line bg-raised px-3 py-2 text-xs shadow-raised">
       <div className="font-medium text-ink">Week of {p.week}</div>
-      <div className="mt-0.5 text-ink-3">{p.sets} working sets</div>
+      <div className="mt-0.5 text-ink-3">{p.sets} muscle sets</div>
     </div>
   )
 }
@@ -69,7 +88,7 @@ export default function Progress() {
         setExercises(exs)
         setWeekly(
           weeklyVolume.map((w) => ({
-            week: formatShortDate(w.week_start),
+            week: parseDateOnly(w.week_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
             sets: Object.values(w.body_parts || {}).reduce((a, b) => a + b, 0),
           })),
         )
@@ -86,6 +105,7 @@ export default function Progress() {
       setData(
         (d.progress || []).map((p) => ({
           ...p,
+          rawDate: p.date,
           date: formatShortDate(p.date),
         })),
       )
@@ -100,9 +120,32 @@ export default function Progress() {
     const first = data[0].avg_e1rm
     const latest = Math.round(data[data.length - 1].avg_e1rm)
     const delta = Math.round((data[data.length - 1].avg_e1rm - first) * 10) / 10
-    const pct = first > 0 ? Math.round((delta / first) * 100) : 0
-    return { best, latest, delta, pct, sessions: data.length }
+    const pctRaw = first > 0 ? (delta / first) * 100 : 0
+    const pct = Math.round(pctRaw)
+    return { best, latest, delta, pct, pctRaw, sessions: data.length }
   }, [data])
+
+  // Duplicate-day lookup for the history table: rows sharing a calendar date
+  // get their time-of-day appended so they stay distinguishable.
+  const dayCounts = useMemo(() => {
+    const counts = {}
+    data.forEach((p) => {
+      const k = new Date(p.rawDate).toDateString()
+      counts[k] = (counts[k] || 0) + 1
+    })
+    return counts
+  }, [data])
+
+  function tableDate(p) {
+    const d = new Date(p.rawDate)
+    const opts = { month: 'short', day: 'numeric' }
+    if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric'
+    let label = d.toLocaleDateString('en-US', opts)
+    if (dayCounts[d.toDateString()] > 1) {
+      label += ` · ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+    }
+    return label
+  }
 
   if (loading) return <PageSkeleton />
 
@@ -155,16 +198,26 @@ export default function Progress() {
             {/* KPI row */}
             <div className="grid grid-cols-3 gap-2.5">
               <StatTile label="Current e1RM" value={`${stats.latest}`} sub="kg" />
-              <StatTile
-                label="This block"
-                value={
-                  <span className={stats.delta >= 0 ? 'text-ok' : 'text-danger'}>
-                    {stats.delta >= 0 ? '▲' : '▼'} {Math.abs(stats.delta)}
-                  </span>
-                }
-                sub={`kg (${stats.pct >= 0 ? '+' : ''}${stats.pct}%)`}
-              />
-              <StatTile label="Sessions" value={stats.sessions} sub="logged" />
+              {/* One data point is not a trend — and small dips are noise,
+                  not alarms. Color only speaks at ≥5% either way. */}
+              {stats.sessions < 2 ? (
+                <StatTile label="This block" value={<span className="text-ink-2">—</span>} sub="first session" />
+              ) : (
+                <StatTile
+                  label="This block"
+                  value={
+                    <span
+                      className={
+                        Math.abs(stats.pctRaw) < 5 ? 'text-ink-2' : stats.delta >= 0 ? 'text-ok' : 'text-danger'
+                      }
+                    >
+                      {stats.delta >= 0 ? '▲' : '▼'} {Math.abs(stats.delta)}
+                    </span>
+                  }
+                  sub={`kg (${stats.pct >= 0 ? '+' : ''}${stats.pct}%)`}
+                />
+              )}
+              <StatTile label={stats.sessions === 1 ? 'Session' : 'Sessions'} value={stats.sessions} sub="logged" />
             </div>
 
             {/* e1RM trend */}
@@ -189,7 +242,9 @@ export default function Progress() {
                     tick={axisTick}
                     axisLine={false}
                     tickLine={false}
-                    domain={['auto', 'auto']}
+                    domain={[(dataMin) => Math.floor(dataMin - 2.5), (dataMax) => Math.ceil(dataMax + 2.5)]}
+                    allowDecimals={false}
+                    tickFormatter={(v) => Math.round(v)}
                     width={52}
                   />
                   <Tooltip content={<E1RMTooltip />} cursor={{ stroke: chart.grid }} />
@@ -211,7 +266,9 @@ export default function Progress() {
                   >
                     <LabelList
                       dataKey="avg_e1rm"
-                      content={(props) => <LastPointLabel {...props} count={data.length} fill={chart.ink} />}
+                      content={(props) => (
+                        <PointLabel {...props} count={data.length} fill={chart.ink} mutedFill={chart.axisText} />
+                      )}
                     />
                   </Line>
                 </ComposedChart>
@@ -229,22 +286,46 @@ export default function Progress() {
               </button>
               {showHistory && (
                 <div className="px-4 pb-4 text-xs">
-                  <div className="grid grid-cols-5 gap-2 border-b border-line pb-1 font-medium text-ink-3">
-                    <div>Date</div>
-                    <div>Weight</div>
-                    <div>Reps</div>
-                    <div>RIR</div>
-                    <div>e1RM</div>
-                  </div>
-                  {[...data].reverse().map((p, i) => (
-                    <div key={i} className="grid grid-cols-5 gap-2 border-b border-line/50 py-1.5 text-ink-2 tabular-nums">
-                      <div>{p.date}</div>
-                      <div>{p.weight} kg</div>
-                      <div>{p.reps}</div>
-                      <div>{p.rir ?? '–'}</div>
-                      <div className="font-semibold text-ink">{p.avg_e1rm}</div>
+                  <div className="flex items-center gap-2 border-b border-line pb-1 font-medium text-ink-3">
+                    <div className="grid flex-1 grid-cols-[1.5fr_1fr_0.6fr_0.6fr_1fr] gap-2">
+                      <div>Date</div>
+                      <div>Weight</div>
+                      <div>Reps</div>
+                      <div>RIR</div>
+                      <div>e1RM</div>
                     </div>
-                  ))}
+                    <div className="w-3.5 shrink-0" />
+                  </div>
+                  {[...data].reverse().map((p, i) => {
+                    const cells = (
+                      <div className="grid flex-1 grid-cols-[1.5fr_1fr_0.6fr_0.6fr_1fr] gap-2">
+                        <div>{tableDate(p)}</div>
+                        <div>{p.weight} kg</div>
+                        <div>{p.reps}</div>
+                        <div>{p.rir ?? '–'}</div>
+                        <div className="font-semibold text-ink">{p.avg_e1rm}</div>
+                      </div>
+                    )
+                    // Each row opens the workout it came from (when the point
+                    // carries its session id).
+                    return p.session_id ? (
+                      <Link
+                        key={i}
+                        to={`/sessions/${p.session_id}`}
+                        className="flex min-h-11 items-center gap-2 border-b border-line/50 py-1.5 text-ink-2 tabular-nums transition-colors hover:bg-sunken active:bg-sunken"
+                      >
+                        {cells}
+                        <svg className="h-3.5 w-3.5 shrink-0 text-ink-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </Link>
+                    ) : (
+                      <div key={i} className="flex items-center gap-2 border-b border-line/50 py-1.5 text-ink-2 tabular-nums">
+                        {cells}
+                        <div className="w-3.5 shrink-0" />
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -256,7 +337,7 @@ export default function Progress() {
       {weekly.length > 0 && (
         <div className="rounded-card border border-line bg-card p-4 shadow-card">
           <div className="text-sm font-semibold text-ink">Weekly volume</div>
-          <div className="mb-1 text-[11px] text-ink-3">Working sets per week, current block</div>
+          <div className="mb-1 text-[11px] text-ink-3">Muscle sets per week — each set counts once per muscle it works</div>
           <ResponsiveContainer width="100%" height={160}>
             <BarChart data={weekly} margin={{ top: 18, right: 8, left: -18, bottom: 0 }} barCategoryGap="30%">
               <CartesianGrid stroke={chart.grid} strokeWidth={1} vertical={false} />

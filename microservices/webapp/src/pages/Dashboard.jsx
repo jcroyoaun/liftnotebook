@@ -6,8 +6,10 @@ import { getLatestWeeklyVolume } from './dashboardVolume'
 import ExerciseDetailButton from '../components/ExerciseDetailButton'
 import StatTile from '../components/ui/StatTile'
 import Button from '../components/ui/Button'
+import BottomSheet from '../components/ui/BottomSheet'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import { PageSkeleton } from '../components/ui/Skeleton'
+import { getActiveSession, ACTIVE_SESSION_KEY } from '../lib/activeSession'
 import { useToast } from '../lib/toastContext'
 import { useChartTheme } from '../lib/chartTheme'
 
@@ -20,6 +22,9 @@ export default function Dashboard() {
   const [actualVolume, setActualVolume] = useState([])
   const [sessions, setSessions] = useState([])
   const [confirmAction, setConfirmAction] = useState(null) // 'end' | 'delete' | null
+  // Day whose Start tap is parked behind the "workout in progress" sheet.
+  const [pendingStart, setPendingStart] = useState(null)
+  const [discarding, setDiscarding] = useState(false)
   // Per-day expand/collapse overrides. Unset days fall back to the smart
   // default (the suggested next day opens), so the badge is a default, not
   // a dictator — any combination of days can be open at once.
@@ -73,7 +78,18 @@ export default function Dashboard() {
     }
   }
 
-  async function startWorkout(day) {
+  function startWorkout(day) {
+    // Mid-workout guard: starting always creates a NEW session, so an
+    // existing activeSession means the lifter is about to stack a second
+    // workout on top of an unfinished one — make that an explicit choice.
+    if (getActiveSession()?.id) {
+      setPendingStart(day)
+      return
+    }
+    launchWorkout(day)
+  }
+
+  async function launchWorkout(day) {
     setStarting(day.id)
     try {
       const data = await api.createSession({
@@ -85,6 +101,36 @@ export default function Dashboard() {
       toast(err.message)
     } finally {
       setStarting(null)
+    }
+  }
+
+  function resumeActive() {
+    const active = getActiveSession()
+    setPendingStart(null)
+    if (active?.id) navigate(`/workout/${active.id}`)
+  }
+
+  async function discardAndStartNew() {
+    const day = pendingStart
+    const active = getActiveSession()
+    setDiscarding(true)
+    try {
+      if (active?.id) {
+        try {
+          const d = await api.getSession(active.id)
+          const recorded = (d.sets || []).filter((s) => s.recorded).length
+          // Empty shells get deleted; anything with logged work stays in the
+          // books — we only abandon it.
+          if (recorded === 0) await api.deleteSession(active.id)
+        } catch (err) {
+          console.error('Discard check failed:', err)
+        }
+      }
+      localStorage.removeItem(ACTIVE_SESSION_KEY)
+      setPendingStart(null)
+      await launchWorkout(day)
+    } finally {
+      setDiscarding(false)
     }
   }
 
@@ -163,8 +209,15 @@ export default function Dashboard() {
   const weekStart = new Date()
   weekStart.setHours(0, 0, 0, 0)
   weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)) // Monday
-  const sessionsThisWeek = trained.filter(s => new Date(s.performed_at) >= weekStart).length
-  const setsThisWeek = Math.round(actualVolume.reduce((sum, bp) => sum + bp.total_sets, 0))
+  const weekSessions = trained.filter(s => new Date(s.performed_at) >= weekStart)
+  // Actual sets logged this week — not per-muscle volume credit (a set that
+  // works two muscles still counts once here; the volume table below keeps
+  // the credited framing).
+  const setsThisWeek = weekSessions.reduce((sum, s) => sum + (s.recorded_sets || 0), 0)
+  // Distinct training days completed this week — repeats and partials don't
+  // inflate the count past the split.
+  const doneDayIds = new Set(weekSessions.map(s => s.training_day_id))
+  const workoutsThisWeek = doneDayIds.size
 
   // Consistency streak: consecutive Monday-weeks with at least one workout,
   // counting back from this week. A quiet current week doesn't break the
@@ -187,12 +240,13 @@ export default function Dashboard() {
   const lastDayNumber = lastSession
     ? sortedDays.find(d => d.id === lastSession.training_day_id)?.day_number ?? 0
     : 0
-  const nextDay = sortedDays.length
+  const cyclicNext = sortedDays.length
     ? sortedDays.find(d => d.day_number === (lastDayNumber % sortedDays.length) + 1) || sortedDays[0]
     : null
-  const doneDayIds = new Set(
-    trained.filter(s => new Date(s.performed_at) >= weekStart).map(s => s.training_day_id)
-  )
+  // Up next = first day in program order not yet done this week. Once every
+  // day is done, fall back to the cyclic pick for the default expansion —
+  // but the badge itself never sits on a ✓ Done card.
+  const nextDay = sortedDays.find(d => !doneDayIds.has(d.id)) || cyclicNext
 
   const todayLine = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   const firstName = (getUser()?.name || '').split(' ')[0]
@@ -229,19 +283,19 @@ export default function Dashboard() {
           <div className="h-1 overflow-hidden rounded-full bg-line">
             <div
               className="h-full rounded-full bg-accent-solid transition-all duration-500"
-              style={{ width: `${Math.min(100, (sessionsThisWeek / meso.days_per_week) * 100)}%` }}
+              style={{ width: `${Math.min(100, (workoutsThisWeek / meso.days_per_week) * 100)}%` }}
             />
           </div>
           <div className="mt-1.5 text-right text-[11px] text-ink-3 tabular-nums">
-            {sessionsThisWeek} of {meso.days_per_week} sessions this week
+            {workoutsThisWeek} of {meso.days_per_week} {meso.days_per_week === 1 ? 'workout' : 'workouts'} this week
           </div>
         </div>
       </div>
 
       {/* Week at a glance */}
       <div className="grid grid-cols-3 gap-2.5">
-        <StatTile label="workouts" value={`${sessionsThisWeek}/${meso.days_per_week}`} sub="this week" />
-        <StatTile label="sets" value={setsThisWeek} sub="this week" />
+        <StatTile label="workouts" value={`${workoutsThisWeek}/${meso.days_per_week}`} sub="this week" />
+        <StatTile label={setsThisWeek === 1 ? 'set' : 'sets'} value={setsThisWeek} sub="this week" />
         <StatTile
           label="week streak"
           value={streakWeeks}
@@ -257,9 +311,20 @@ export default function Dashboard() {
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-2">This block</h3>
           <div className="space-y-2.5">
             {sortedDays.map(day => {
-              const isNext = day.id === nextDay?.id
               const isDone = doneDayIds.has(day.id)
-              const open = dayOverrides[day.id] ?? isNext
+              const isSuggested = day.id === nextDay?.id
+              // A ✓ Done card never wears the Up next badge, even in the
+              // all-days-done fallback (the suggestion still opens the card).
+              const isNext = isSuggested && !isDone
+              const open = dayOverrides[day.id] ?? isSuggested
+              // Done days link back to this week's latest workout for the day.
+              const daySession = isDone
+                ? weekSessions
+                    .filter(s => s.training_day_id === day.id)
+                    .reduce((latest, s) =>
+                      !latest || new Date(s.performed_at) > new Date(latest.performed_at) ? s : latest,
+                    null)
+                : null
               const doneChip = isDone && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-ok-wash px-2 py-0.5 text-[11px] font-medium text-ok">
                   ✓ Done
@@ -304,7 +369,7 @@ export default function Dashboard() {
                             disabled={starting === day.id}
                             className="min-h-8 rounded-btn border border-line-2 bg-card px-3 py-1 text-xs font-semibold text-ink transition-all hover:bg-sunken active:scale-[0.97] disabled:opacity-50"
                           >
-                            {starting === day.id ? 'Starting...' : 'Start Workout'}
+                            {starting === day.id ? 'Starting...' : isDone ? 'Start again' : 'Start Workout'}
                           </button>
                         )}
                       </div>
@@ -319,7 +384,7 @@ export default function Dashboard() {
                               className="inline-flex items-center rounded-md bg-sunken px-2 py-1 text-xs text-ink-2 transition-colors hover:bg-wash hover:text-accent"
                             >
                               {ex.exercise_name}
-                              <span className="ml-1 text-ink-4">{ex.target_sets}s</span>
+                              <span className="ml-1 text-ink-4">×{ex.target_sets}</span>
                             </ExerciseDetailButton>
                           ))}
                         </div>
@@ -329,7 +394,7 @@ export default function Dashboard() {
                     )}
                     {open && (
                       <p className="mt-1 pl-6 text-[13px] text-ink-3">
-                        {(day.exercises || []).length} exercises · 2 working sets each, to failure
+                        {(day.exercises || []).length} {(day.exercises || []).length === 1 ? 'exercise' : 'exercises'} · 2 working sets each, to failure
                       </p>
                     )}
                   </div>
@@ -354,12 +419,21 @@ export default function Dashboard() {
                         <p className="px-4 py-3 text-xs text-ink-3">No exercises assigned yet</p>
                       )}
                       <div className="p-4 pt-3">
+                        {isDone && daySession && (
+                          <Link
+                            to={`/sessions/${daySession.id}`}
+                            className="mb-2 flex min-h-11 w-full items-center justify-center rounded-btn text-sm font-semibold text-accent transition-colors active:bg-wash"
+                          >
+                            View workout →
+                          </Link>
+                        )}
                         <Button
+                          variant={isDone ? 'secondary' : 'primary'}
                           className="w-full min-h-13 text-[15px]"
                           onClick={() => startWorkout(day)}
                           disabled={starting === day.id}
                         >
-                          {starting === day.id ? 'Starting...' : 'Start Workout'}
+                          {starting === day.id ? 'Starting...' : isDone ? 'Start again' : 'Start Workout'}
                         </Button>
                       </div>
                     </>
@@ -409,7 +483,12 @@ export default function Dashboard() {
       {/* Recent workouts: read-only history, tap through for the set log */}
       {trained.length > 0 && (
         <div>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-2">Recent workouts</h3>
+          <div className="mb-2 flex items-baseline justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-2">Recent workouts</h3>
+            <Link to="/history" className="text-[13px] font-medium text-accent">
+              View all →
+            </Link>
+          </div>
           <div className="divide-y divide-line overflow-hidden rounded-card border border-line bg-card shadow-card">
             {[...trained]
               .sort((a, b) => new Date(b.performed_at) - new Date(a.performed_at))
@@ -424,6 +503,10 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2">
                     <span className="text-[13px] text-ink-3 tabular-nums">
                       {new Date(s.performed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {' · '}
+                      {new Date(s.performed_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                      {' · '}
+                      {s.recorded_sets ?? 0} {(s.recorded_sets ?? 0) === 1 ? 'set' : 'sets'}
                     </span>
                     <svg className="h-4 w-4 text-ink-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -434,6 +517,27 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Two real choices (Resume / Discard), so this is a BottomSheet rather
+          than the single-action ConfirmSheet. */}
+      <BottomSheet open={!!pendingStart} onClose={() => setPendingStart(null)} title="Workout in progress">
+        <p className="mb-4 text-sm text-ink-2">
+          You're mid-workout. Resume it, or discard and start fresh?
+        </p>
+        <div className="flex flex-col gap-2">
+          <Button className="w-full" onClick={resumeActive}>
+            Resume
+          </Button>
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={discardAndStartNew}
+            disabled={discarding}
+          >
+            {discarding ? 'Starting...' : 'Discard & start new'}
+          </Button>
+        </div>
+      </BottomSheet>
 
       <ConfirmSheet
         open={confirmAction === 'end'}

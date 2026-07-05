@@ -115,6 +115,7 @@ export default function CreateMesocycle() {
                 type="text"
                 value={label}
                 onChange={e => updateLabel(i, e.target.value)}
+                onFocus={e => e.target.select()}
                 required
                 placeholder={`Day ${i + 1}`}
                 className="flex-1"

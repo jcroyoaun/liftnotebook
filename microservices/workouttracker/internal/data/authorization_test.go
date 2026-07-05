@@ -80,8 +80,8 @@ func TestWorkoutSetModelInsertForUserReturnsNotFoundForUnknownSession(t *testing
 	sqlDB, stub := newStubDB(t,
 		stubExpectation{
 			op:          "query",
-			sqlContains: "FROM workout_sessions ws WHERE ws.id = $1 AND ws.user_id = $9",
-			args:        []driver.Value{int64(5), int64(11), int64(1), 100.0, int64(8), nil, false, nil, int64(9)},
+			sqlContains: "FROM workout_sessions ws WHERE ws.id = $1 AND ws.user_id = $11",
+			args:        []driver.Value{int64(5), int64(11), int64(1), 100.0, nil, nil, int64(8), nil, false, nil, int64(9)},
 			rows: &stubRows{
 				columns: []string{"id", "created_at", "version"},
 			},
@@ -109,8 +109,8 @@ func TestWorkoutSetModelUpdateForUserReturnsNotFoundForUnauthorizedSet(t *testin
 	sqlDB, stub := newStubDB(t,
 		stubExpectation{
 			op:          "query",
-			sqlContains: "FROM workout_sessions ws WHERE wset.id = $5 AND wset.workout_session_id = ws.id AND ws.user_id = $6",
-			args:        []driver.Value{120.0, int64(6), nil, true, int64(44), int64(9)},
+			sqlContains: "FROM workout_sessions ws WHERE wset.id = $7 AND wset.workout_session_id = ws.id AND ws.user_id = $8",
+			args:        []driver.Value{120.0, nil, nil, int64(6), nil, true, int64(44), int64(9)},
 			rows: &stubRows{
 				columns: []string{"version"},
 			},
@@ -158,8 +158,8 @@ func TestWorkoutSetModelInsertForUserInsertsOwnedSession(t *testing.T) {
 	sqlDB, stub := newStubDB(t,
 		stubExpectation{
 			op:          "query",
-			sqlContains: "FROM workout_sessions ws WHERE ws.id = $1 AND ws.user_id = $9",
-			args:        []driver.Value{int64(5), int64(11), int64(1), 100.0, int64(8), nil, false, nil, int64(9)},
+			sqlContains: "FROM workout_sessions ws WHERE ws.id = $1 AND ws.user_id = $11",
+			args:        []driver.Value{int64(5), int64(11), int64(1), 100.0, nil, nil, int64(8), nil, false, nil, int64(9)},
 			rows: &stubRows{
 				columns: []string{"id", "created_at", "version"},
 				values:  [][]driver.Value{{int64(88), createdAt, int64(1)}},
