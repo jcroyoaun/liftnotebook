@@ -325,10 +325,22 @@ export default function Dashboard() {
                       !latest || new Date(s.performed_at) > new Date(latest.performed_at) ? s : latest,
                     null)
                 : null
-              const doneChip = isDone && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-ok-wash px-2 py-0.5 text-[11px] font-medium text-ok">
-                  ✓ Done
+              // A workout in progress owns its day card: every action leads
+              // back into the logger — navigating away and returning must
+              // never route through "Start" or the plan editor.
+              const active = getActiveSession()
+              const activeForDay = active?.id && active.label === day.label ? active : null
+              const doneChip = activeForDay ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-wash px-2 py-0.5 text-[11px] font-medium text-accent">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent-solid" aria-hidden="true" />
+                  In progress
                 </span>
+              ) : (
+                isDone && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-ok-wash px-2 py-0.5 text-[11px] font-medium text-ok">
+                    ✓ Done
+                  </span>
+                )
               )
               return (
                 <div key={day.id} className="overflow-hidden rounded-card border border-line bg-card shadow-card">
@@ -364,13 +376,22 @@ export default function Dashboard() {
                           Edit plan
                         </Link>
                         {!open && (
-                          <button
-                            onClick={() => startWorkout(day)}
-                            disabled={starting === day.id}
-                            className="min-h-8 rounded-btn border border-line-2 bg-card px-3 py-1 text-xs font-semibold text-ink transition-all hover:bg-sunken active:scale-[0.97] disabled:opacity-50"
-                          >
-                            {starting === day.id ? 'Starting...' : isDone ? 'Start again' : 'Start Workout'}
-                          </button>
+                          activeForDay ? (
+                            <button
+                              onClick={() => navigate(`/workout/${activeForDay.id}`)}
+                              className="min-h-8 rounded-btn bg-accent-solid px-3 py-1 text-xs font-semibold text-on-accent transition-all active:scale-[0.97]"
+                            >
+                              Continue
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => startWorkout(day)}
+                              disabled={starting === day.id}
+                              className="min-h-8 rounded-btn border border-line-2 bg-card px-3 py-1 text-xs font-semibold text-ink transition-all hover:bg-sunken active:scale-[0.97] disabled:opacity-50"
+                            >
+                              {starting === day.id ? 'Starting...' : isDone ? 'Start again' : 'Start Workout'}
+                            </button>
+                          )
                         )}
                       </div>
                     </div>
@@ -400,7 +421,11 @@ export default function Dashboard() {
                   </div>
                   {open && (
                     <>
-                      {isDone && daySession ? (
+                      {activeForDay ? (
+                        // Mid-workout: live progress so far — coming back
+                        // after wandering off shows exactly where you left it.
+                        <DoneDayResults sessionId={activeForDay.id} />
+                      ) : isDone && daySession ? (
                         // Done days show the receipts, not the plan — what was
                         // actually lifted, per set, right on the card.
                         <DoneDayResults sessionId={daySession.id} />
@@ -423,22 +448,33 @@ export default function Dashboard() {
                         <p className="px-4 py-3 text-xs text-ink-3">No exercises assigned yet</p>
                       )}
                       <div className="p-4 pt-3">
-                        {isDone && daySession && (
-                          <Link
-                            to={`/sessions/${daySession.id}`}
-                            className="mb-2 flex min-h-11 w-full items-center justify-center rounded-btn text-sm font-semibold text-accent transition-colors active:bg-wash"
+                        {activeForDay ? (
+                          <Button
+                            className="w-full min-h-13 text-[15px]"
+                            onClick={() => navigate(`/workout/${activeForDay.id}`)}
                           >
-                            View workout →
-                          </Link>
+                            Continue workout →
+                          </Button>
+                        ) : (
+                          <>
+                            {isDone && daySession && (
+                              <Link
+                                to={`/sessions/${daySession.id}`}
+                                className="mb-2 flex min-h-11 w-full items-center justify-center rounded-btn text-sm font-semibold text-accent transition-colors active:bg-wash"
+                              >
+                                View workout →
+                              </Link>
+                            )}
+                            <Button
+                              variant={isDone ? 'secondary' : 'primary'}
+                              className="w-full min-h-13 text-[15px]"
+                              onClick={() => startWorkout(day)}
+                              disabled={starting === day.id}
+                            >
+                              {starting === day.id ? 'Starting...' : isDone ? 'Start again' : 'Start Workout'}
+                            </Button>
+                          </>
                         )}
-                        <Button
-                          variant={isDone ? 'secondary' : 'primary'}
-                          className="w-full min-h-13 text-[15px]"
-                          onClick={() => startWorkout(day)}
-                          disabled={starting === day.id}
-                        >
-                          {starting === day.id ? 'Starting...' : isDone ? 'Start again' : 'Start Workout'}
-                        </Button>
                       </div>
                     </>
                   )}
