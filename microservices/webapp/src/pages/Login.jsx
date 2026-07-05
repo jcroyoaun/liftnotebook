@@ -5,6 +5,7 @@ import { setSession, isTokenValid } from '../auth/session'
 import AuthShell from '../components/AuthShell'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
+import { BUILD_ID } from '../lib/version'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -63,6 +64,7 @@ export default function Login() {
             </Link>
           </p>
         </div>
+        <p className="pt-1 text-center text-[11px] text-ink-4">build {BUILD_ID}</p>
       </form>
     </AuthShell>
   )

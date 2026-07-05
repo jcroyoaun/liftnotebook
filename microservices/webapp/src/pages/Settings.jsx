@@ -19,6 +19,7 @@ import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import { useToast } from '../lib/toastContext'
 import { useTheme } from '../lib/themeContext'
+import { BUILD_ID } from '../lib/version'
 
 const THEME_OPTIONS = [
   { value: 'light', label: 'Light' },
@@ -330,7 +331,7 @@ export default function Settings() {
         </div>
         <div className="flex min-h-12 items-center justify-between px-4 py-3">
           <span className="text-sm text-ink">App</span>
-          <span className="text-sm text-ink-3">LiftNotebook</span>
+          <span className="text-sm text-ink-3">LiftNotebook · build {BUILD_ID}</span>
         </div>
         <button
           onClick={logout}
