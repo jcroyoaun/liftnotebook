@@ -361,7 +361,7 @@ export default function Dashboard() {
                           to={`/programs/${meso.id}/setup/${day.id}`}
                           className="min-h-8 rounded-btn px-2 py-1 text-xs font-medium text-ink-3 transition-colors hover:bg-sunken hover:text-ink-2"
                         >
-                          Edit
+                          Edit plan
                         </Link>
                         {!open && (
                           <button
