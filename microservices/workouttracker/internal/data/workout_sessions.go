@@ -124,8 +124,9 @@ func (m WorkoutSessionModel) Update(session *WorkoutSession) error {
 }
 
 // SessionSummary is one row of the cross-block workout history list:
-// enough to render "Upper A · Jun 12 · 8 sets · 2,340 kg · Bench, Squat"
-// without fetching each session.
+// enough to render "Upper A · Jun 12 · 8 sets · Bench, Squat" without
+// fetching each session. No tonnage — the house method runs on sets to
+// failure, kg totals are deliberate non-information.
 type SessionSummary struct {
 	ID            int64     `json:"id"`
 	PerformedAt   time.Time `json:"performed_at"`
@@ -133,19 +134,15 @@ type SessionSummary struct {
 	MesocycleID   int64     `json:"mesocycle_id"`
 	MesocycleName string    `json:"mesocycle_name"`
 	RecordedSets  int       `json:"recorded_sets"`
-	TotalVolumeKg float64   `json:"total_volume_kg"`
 	Exercises     []string  `json:"exercises"`
 }
 
 // ListForUser returns the user's sessions across ALL mesocycles, newest
-// first, paginated. Tonnage counts both limbs for unilateral sets
-// ((left+right)×reps); exercise names are ordered by first recorded set.
+// first, paginated. Exercise names are ordered by first recorded set.
 func (m WorkoutSessionModel) ListForUser(userID int64, page, pageSize int) ([]SessionSummary, int, error) {
 	query := `
 		SELECT count(*) OVER(), ws.id, ws.performed_at, td.label, ws.mesocycle_id, mc.name,
 		       (SELECT count(*) FROM workout_sets s WHERE s.workout_session_id = ws.id AND s.recorded),
-		       COALESCE((SELECT SUM(CASE WHEN s.weight_left IS NOT NULL THEN (s.weight_left + s.weight_right) * s.reps ELSE s.weight * s.reps END)
-		                 FROM workout_sets s WHERE s.workout_session_id = ws.id AND s.recorded), 0),
 		       COALESCE((SELECT array_agg(x.name ORDER BY x.first_set_id)
 		                 FROM (SELECT e.name, MIN(s.id) AS first_set_id
 		                       FROM workout_sets s
@@ -175,7 +172,7 @@ func (m WorkoutSessionModel) ListForUser(userID int64, page, pageSize int) ([]Se
 		var exercises pq.StringArray
 		err := rows.Scan(
 			&total, &s.ID, &s.PerformedAt, &s.DayLabel, &s.MesocycleID, &s.MesocycleName,
-			&s.RecordedSets, &s.TotalVolumeKg, &exercises,
+			&s.RecordedSets, &exercises,
 		)
 		if err != nil {
 			return nil, 0, err
