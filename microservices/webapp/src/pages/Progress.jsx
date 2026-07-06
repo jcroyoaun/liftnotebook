@@ -9,6 +9,7 @@ import { useChartTheme, formatShortDate } from '../lib/chartTheme'
 import ExerciseDetailButton from '../components/ExerciseDetailButton'
 import StatTile from '../components/ui/StatTile'
 import { Skeleton, PageSkeleton } from '../components/ui/Skeleton'
+import { getActiveSession } from '../lib/activeSession'
 
 function E1RMTooltip({ active, payload }) {
   if (!active || !payload?.length) return null
@@ -307,11 +308,17 @@ export default function Progress() {
                       </div>
                     )
                     // Each row opens the workout it came from (when the point
-                    // carries its session id).
+                    // carries its session id) — straight into the logger,
+                    // the one view of a workout.
                     return p.session_id ? (
                       <Link
                         key={i}
-                        to={`/sessions/${p.session_id}`}
+                        to={`/workout/${p.session_id}`}
+                        state={
+                          String(getActiveSession()?.id) === String(p.session_id)
+                            ? undefined
+                            : { edit: true }
+                        }
                         className="flex min-h-11 items-center gap-2 border-b border-line/50 py-1.5 text-ink-2 tabular-nums transition-colors hover:bg-sunken active:bg-sunken"
                       >
                         {cells}

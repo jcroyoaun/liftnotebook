@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import { Skeleton } from '../components/ui/Skeleton'
+import { getActiveSession } from '../lib/activeSession'
 
 const PAGE_SIZE = 20
 
@@ -93,11 +94,17 @@ export default function History() {
                 {g.label}
               </h3>
               <div className="space-y-2">
+                {/* One view per workout: rows open the logger directly —
+                    edit mode for finished sessions, live for the active one. */}
                 {g.items.map((s) => (
                   <Link
                     key={s.id}
-                    to={`/sessions/${s.id}`}
-                    state={{ from: 'history' }}
+                    to={`/workout/${s.id}`}
+                    state={
+                      String(getActiveSession()?.id) === String(s.id)
+                        ? undefined
+                        : { edit: true, from: 'history' }
+                    }
                     className="block min-h-11 rounded-card border border-line bg-card px-4 py-3 shadow-card transition-all active:scale-[0.99] active:bg-sunken"
                   >
                     <div className="flex items-baseline justify-between gap-3">

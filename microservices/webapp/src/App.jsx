@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import ResetPassword from './pages/ResetPassword'
@@ -8,7 +8,6 @@ import History from './pages/History'
 import CreateMesocycle from './pages/CreateMesocycle'
 import SetupDayExercises from './pages/SetupDayExercises'
 import Workout from './features/workout/WorkoutSession'
-import SessionDetail from './pages/SessionDetail'
 import Progress from './pages/Progress'
 import Volume from './pages/Volume'
 import MesocycleHistory from './pages/MesocycleHistory'
@@ -21,6 +20,7 @@ import AppLayout from './components/layout/AppLayout'
 import FocusLayout from './components/layout/FocusLayout'
 import { ToastProvider } from './components/ui/Toast'
 import { isTokenValid, clearSession, isAdmin } from './auth/session'
+import { getActiveSession } from './lib/activeSession'
 
 // Navigating to a new page must land at the top — without this, a tap on a
 // long list carries the old scroll position into the next route and can open
@@ -48,6 +48,15 @@ function AdminRoute({ children }) {
   return children
 }
 
+// One view per workout: old /sessions/:id links (bookmarks, installed PWAs
+// mid-update) land in the logger — edit mode for finished sessions, live
+// for the one still in progress.
+function SessionRedirect() {
+  const { id } = useParams()
+  const live = String(getActiveSession()?.id) === String(id)
+  return <Navigate to={`/workout/${id}`} state={live ? undefined : { edit: true }} replace />
+}
+
 export default function App() {
   return (
     <ToastProvider>
@@ -67,8 +76,9 @@ export default function App() {
         <Route path="/programs/:id/setup/:dayId" element={<SetupDayExercises />} />
         <Route path="/programs/:id/volume" element={<Volume />} />
         <Route path="/programs/history" element={<MesocycleHistory />} />
-        {/* Read-only view of a logged workout; editing stays in /workout */}
-        <Route path="/sessions/:id" element={<SessionDetail />} />
+        {/* Legacy: the read-only record page is gone — the logger is the
+            one view of a workout */}
+        <Route path="/sessions/:id" element={<SessionRedirect />} />
         <Route path="/progress" element={<Progress />} />
         <Route path="/settings" element={<Settings />} />
 

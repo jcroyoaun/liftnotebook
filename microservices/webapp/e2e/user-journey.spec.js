@@ -74,11 +74,18 @@ async function loginAndGo(page, path) {
   }
 }
 
-// Helper: finish the active workout. When sets were recorded the summary
-// sheet appears first; dismiss it. When the client saw no recorded sets the
-// app navigates straight home, so the dismiss click just times out quietly.
+// Helper: finish the active workout. Off-plan drift (extra sets, swaps…)
+// asks its scope question first — these journeys keep the program as
+// written. Then the summary sheet appears when sets were recorded; dismiss
+// it. When the client saw no recorded sets the app navigates straight home,
+// so each click just times out quietly.
 async function finishWorkout(page) {
   await page.click('button:has-text("Finish")')
+  try {
+    await page.click('button:has-text("This workout only")', { timeout: 2000 })
+  } catch {
+    // no drift from the plan — no scope prompt
+  }
   try {
     await page.click('button:has-text("Back to Today")', { timeout: 2000 })
   } catch {

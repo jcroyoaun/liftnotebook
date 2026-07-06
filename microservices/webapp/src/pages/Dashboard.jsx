@@ -96,6 +96,13 @@ export default function Dashboard() {
         mesocycle_id: meso.id,
         training_day_id: day.id,
       })
+      // Mark it active BEFORE navigating: the logger infers edit-vs-live
+      // from this marker, and its own (post-data) write can lose the race
+      // against a fast first fetch that already contains recorded sets.
+      localStorage.setItem(
+        ACTIVE_SESSION_KEY,
+        JSON.stringify({ id: String(data.session.id), label: day.label })
+      )
       navigate(`/workout/${data.session.id}`)
     } catch (err) {
       toast(err.message)
@@ -369,12 +376,19 @@ export default function Dashboard() {
                             Up next
                           </span>
                         )}
-                        <Link
-                          to={`/programs/${meso.id}/setup/${day.id}`}
-                          className="min-h-8 rounded-btn px-2 py-1 text-xs font-medium text-ink-3 transition-colors hover:bg-sunken hover:text-ink-2"
-                        >
-                          Edit plan
-                        </Link>
+                        {/* One view per workout: once a workout exists for
+                            the day (running or done), the logger is the only
+                            surface — plan changes happen there and propagate
+                            via the save prompt. Edit plan is for days whose
+                            workout doesn't exist yet. */}
+                        {!activeForDay && !isDone && (
+                          <Link
+                            to={`/programs/${meso.id}/setup/${day.id}`}
+                            className="min-h-8 rounded-btn px-2 py-1 text-xs font-medium text-ink-3 transition-colors hover:bg-sunken hover:text-ink-2"
+                          >
+                            Edit plan
+                          </Link>
+                        )}
                         {!open && (
                           activeForDay ? (
                             <button
@@ -415,7 +429,9 @@ export default function Dashboard() {
                     )}
                     {open && (
                       <p className="mt-1 pl-6 text-[13px] text-ink-3">
-                        {(day.exercises || []).length} {(day.exercises || []).length === 1 ? 'exercise' : 'exercises'} · 2 working sets each, to failure
+                        {/* No hardcoded set count — "All future workouts" can
+                            grow a slot's target beyond the house default. */}
+                        {(day.exercises || []).length} {(day.exercises || []).length === 1 ? 'exercise' : 'exercises'} · working sets to failure
                       </p>
                     )}
                   </div>
@@ -459,7 +475,8 @@ export default function Dashboard() {
                           <>
                             {isDone && daySession && (
                               <Link
-                                to={`/sessions/${daySession.id}`}
+                                to={`/workout/${daySession.id}`}
+                                state={{ edit: true }}
                                 className="mb-2 flex min-h-11 w-full items-center justify-center rounded-btn text-sm font-semibold text-accent transition-colors active:bg-wash"
                               >
                                 View workout →
@@ -520,7 +537,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Recent workouts: read-only history, tap through for the set log */}
+      {/* Recent workouts: tap through into the workout view (the logger) */}
       {trained.length > 0 && (
         <div>
           <div className="mb-2 flex items-baseline justify-between">
@@ -536,7 +553,12 @@ export default function Dashboard() {
               .map(s => (
                 <Link
                   key={s.id}
-                  to={`/sessions/${s.id}`}
+                  to={`/workout/${s.id}`}
+                  state={
+                    String(getActiveSession()?.id) === String(s.id)
+                      ? undefined
+                      : { edit: true }
+                  }
                   className="flex min-h-12 items-center justify-between px-4 py-3 transition-colors active:bg-sunken"
                 >
                   <span className="text-sm font-medium text-ink">{s.day_label}</span>

@@ -87,10 +87,10 @@ export function useSyncSet(sessionId) {
       // Debounced write, one timer per set.
       const key = setKey(set)
       const existing = timers.current.get(key)
-      if (existing) clearTimeout(existing)
-      timers.current.set(
-        key,
-        setTimeout(() => {
+      if (existing) clearTimeout(existing.timer)
+      timers.current.set(key, {
+        exerciseId: set.exercise_id,
+        timer: setTimeout(() => {
           timers.current.delete(key)
           // The API rejects unknown JSON keys, so each path sends exactly
           // its own shape: POST upsert (client_id) or PATCH by id (legacy).
@@ -118,12 +118,34 @@ export function useSyncSet(sessionId) {
             : { id: set.id, weight: set.weight, reps: set.reps, rir: set.rir, recorded: set.recorded, ...limb }
           mutation.mutate(vars)
         }, 400),
-      )
+      })
     },
     [queryClient, sessionId, mutation],
   )
 
-  return { syncSet, isPending: mutation.isPending, isPaused: mutation.isPaused }
+  // Removing an exercise must silence its sets' writes, or a debounce timer
+  // (or an offline-queued mutation) fires after the DELETE and upserts the
+  // set right back. Clears pending debounce timers AND drops not-yet-sent
+  // mutations from the (persisted) cache; a request already on the wire is
+  // the one race left, and the removal filter hides its card meanwhile.
+  const cancelPendingFor = useCallback(
+    (exerciseId) => {
+      for (const [key, entry] of timers.current) {
+        if (entry.exerciseId === exerciseId) {
+          clearTimeout(entry.timer)
+          timers.current.delete(key)
+        }
+      }
+      const cache = queryClient.getMutationCache()
+      cache
+        .findAll({ mutationKey: ['syncSet'] })
+        .filter((m) => m.state.variables?.exercise_id === exerciseId && m.state.status !== 'success')
+        .forEach((m) => cache.remove(m))
+    },
+    [queryClient],
+  )
+
+  return { syncSet, cancelPendingFor, isPending: mutation.isPending, isPaused: mutation.isPaused }
 }
 
 export function useDeleteSet(sessionId) {

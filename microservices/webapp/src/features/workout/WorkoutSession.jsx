@@ -3,8 +3,12 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useMutation, useMutationState, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api/client'
 import { useSessionBundle, useSyncSet, useDeleteSet, setKey } from './hooks'
-import { loadSwaps, saveSwap, clearSwaps, applySwaps, mergeExerciseOrder } from './swaps'
+import {
+  loadSwaps, saveSwap, deleteSwap, loadAdds, saveAdds, loadRemovals, saveRemovals, clearPlanEdits,
+  applySwaps, applyAdds, applyRemovals, mergeExerciseOrder, diffPlan, buildFuturePlan,
+} from './swaps'
 import { scheduleRestAlarm, cancelRestAlarm } from '../../lib/push'
+import { getActiveSession } from '../../lib/activeSession'
 import { getRestSeconds } from '../../lib/restPrefs'
 import { useToast } from '../../lib/toastContext'
 import ExerciseLogCard from './ExerciseLogCard'
@@ -20,6 +24,11 @@ import StatTile from '../../components/ui/StatTile'
 const TIMER_KEY = 'restTimerEndsAt'
 const ACTIVE_SESSION_KEY = 'activeSession'
 
+// THE one view of a workout (owner's law): viewing, logging, editing the
+// past, swapping/adding/removing exercises — it all happens here. Whether a
+// structural change also becomes the plan is a single question asked once,
+// at save time ("This workout only" / "All future workouts").
+//
 // No tonnage, no duration on the finish sheet — the house method runs on
 // sets to failure and beating last time's reps; the rest is bloat (owner's
 // words). PRs and the top set carry the celebration.
@@ -100,14 +109,21 @@ export default function WorkoutSession() {
   const queryClient = useQueryClient()
   const toast = useToast()
   const { session, suggestions } = useSessionBundle(sessionId)
-  const { syncSet } = useSyncSet(sessionId)
+  const { syncSet, cancelPendingFor } = useSyncSet(sessionId)
   const deleteSet = useDeleteSet(sessionId)
 
-  // Editing a finished workout is a distinct mode: it never becomes the
-  // "active workout", never re-celebrates on Finish, and exits back to the
-  // read-only record. Survives a mid-edit reload via sessionStorage.
+  // Editing a finished workout is the same view in a distinct mode: it never
+  // becomes the "active workout", never re-celebrates on Finish, and exits
+  // back to wherever the lifter came from. Survives a mid-edit reload via
+  // sessionStorage. Router state alone is NOT trusted: open-in-new-tab and
+  // bookmarks drop it, and a finished workout landing in live mode would be
+  // hijacked as the active one (mini-bar, rest timers, re-celebration) — so
+  // a session with recorded work that isn't the tracked active session is
+  // edit mode by default.
   const editKey = `editingSession:${sessionId}`
-  const [editMode] = useState(() => location.state?.edit === true || sessionStorage.getItem(editKey) === '1')
+  const resolvedKey = `planScopeResolved:${sessionId}`
+  const explicitEdit = location.state?.edit === true || sessionStorage.getItem(editKey) === '1'
+  const exitTo = location.state?.from === 'history' ? '/history' : '/'
 
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true)
   const pendingSets = useMutationState({
@@ -123,7 +139,16 @@ export default function WorkoutSession() {
   const [summary, setSummary] = useState(null)
   const [summaryNote, setSummaryNote] = useState('')
   const [swaps, setSwaps] = useState(() => loadSwaps(sessionId))
+  const [adds, setAdds] = useState(() => loadAdds(sessionId))
+  const [removals, setRemovals] = useState(() => loadRemovals(sessionId))
   const [swapFor, setSwapFor] = useState(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [confirmRemove, setConfirmRemove] = useState(null)
+  const [scopePrompt, setScopePrompt] = useState(null)
+  const [savingScope, setSavingScope] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [notesDraft, setNotesDraft] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
   // Draft rows are DERIVED at render (plan target minus synced rows), so
   // they need only one bit of real state: per-exercise adjustments (extra
   // rows added / drafts explicitly deleted). A draft gets its client_id at
@@ -135,6 +160,36 @@ export default function WorkoutSession() {
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [noteFor, setNoteFor] = useState(null)
   const [noteText, setNoteText] = useState('')
+
+  // Data-driven edit-mode fallback, decided ONCE at first data arrival
+  // (state adjusted during render — React restarts the pass, so effects
+  // only ever see the settled value) so a live workout can't flip to edit
+  // mid-set, plus the entry snapshot the save prompt diffs against: only
+  // drift caused THIS visit may prompt — historical extra sets from weeks
+  // ago must never re-ask, and "All future workouts" must never rewrite
+  // today's template from a stale record.
+  const [inferredEdit, setInferredEdit] = useState(null)
+  if (session.data && inferredEdit === null) {
+    const activeMatch = String(getActiveSession()?.id) === String(sessionId)
+    setInferredEdit(!activeMatch && session.data.sets.some((s) => s.recorded))
+  }
+  const editMode = explicitEdit || inferredEdit === true
+  const entryBaseline = useRef(null)
+  useEffect(() => {
+    if (!session.data || entryBaseline.current) return
+    const counts = {}
+    for (const s of session.data.sets) {
+      if (s.recorded) counts[s.exercise_id] = (counts[s.exercise_id] || 0) + 1
+    }
+    entryBaseline.current = {
+      counts,
+      editsSig: JSON.stringify({
+        swaps: loadSwaps(sessionId),
+        adds: loadAdds(sessionId),
+        removals: loadRemovals(sessionId),
+      }),
+    }
+  }, [session.data, sessionId])
 
   const exerciseNote = useMutation({
     mutationKey: ['syncExerciseNote'],
@@ -202,8 +257,23 @@ export default function WorkoutSession() {
   const suggestionByExercise = new Map((suggestions.data || []).map((s) => [s.exercise_id, s]))
   const noteByExercise = new Map((exerciseNotes || []).map((n) => [n.exercise_id, n.note]))
 
-  const exerciseOrder = mergeExerciseOrder(applySwaps(dayExercises, swaps), sets)
+  // The one exercise list: plan + session adds, mapped through swaps, plus
+  // cards resurrected from off-plan sets, minus session removals. Removals
+  // filter AFTER the merge so a removed card stays gone even while its set
+  // deletions are still in flight.
+  const exerciseOrder = applyRemovals(
+    mergeExerciseOrder(applySwaps(applyAdds(dayExercises, adds), swaps), sets),
+    removals,
+  )
   const recordedCount = sets.filter((s) => s.recorded).length
+
+  function recordedCountsMap() {
+    const m = new Map()
+    for (const s of sets) {
+      if (s.recorded) m.set(s.exercise_id, (m.get(s.exercise_id) || 0) + 1)
+    }
+    return m
+  }
 
   // Materialize the plan as derived draft rows: target_sets minus what's
   // already synced, adjusted by explicit deletes/extras. Drafts are pure
@@ -244,38 +314,96 @@ export default function WorkoutSession() {
     return [...synced, ...drafts].sort((a, b) => a.set_number - b.set_number)
   }
 
-  // Swap the exercise in `swapFor` for `newEx`. "Persist" additionally
-  // rewrites the day template (same slot, same targets) for future weeks.
-  async function performSwap(newEx, persist) {
+  // Swap the exercise in `swapFor` for `newEx` — session-local; the save
+  // prompt decides later whether the plan follows. Swapping an exercise
+  // that is itself a swap replacement rewrites the ORIGINAL slot's mapping
+  // (chains collapse to source → latest, or the second swap would silently
+  // never apply).
+  function performSwap(newEx) {
     const original = swapFor
-    if (persist) {
-      const rewritten = dayExercises.map((e) =>
-        e.exercise_id === original.exercise_id ? { ...e, exercise_id: newEx.id } : e
-      )
-      await api.updateDayExercises(meta.training_day_id, {
-        exercises: rewritten.map((e, i) => ({
-          exercise_id: e.exercise_id,
-          position: i + 1,
-          target_sets: e.target_sets,
-          target_rep_range_low: e.target_rep_range_low,
-          target_rep_range_high: e.target_rep_range_high,
-          target_rir: e.target_rir,
-        })),
-      })
-      queryClient.invalidateQueries({ queryKey: ['session', sessionId] })
-      queryClient.invalidateQueries({ queryKey: ['suggestions', meta.training_day_id] })
+    const source = Object.entries(swaps).find(([, to]) => to.exercise_id === original.exercise_id)?.[0]
+    const fromId = source ? Number(source) : original.exercise_id
+    // Swapping IN something removed earlier cancels the removal, or the
+    // replacement card would be filtered out on arrival.
+    if (removals.includes(newEx.id)) {
+      setRemovals(saveRemovals(sessionId, removals.filter((id) => id !== newEx.id)))
     }
     // Reset draft adjustments for the replaced slot; the swap target derives
     // fresh plan drafts automatically (its laterality rides the swap).
     setDraftAdj((a) => ({ ...a, [original.exercise_id]: undefined }))
     setSwaps(
-      saveSwap(sessionId, original.exercise_id, {
+      saveSwap(sessionId, fromId, {
         exercise_id: newEx.id,
         exercise_name: newEx.name,
         laterality: newEx.laterality,
       })
     )
     setSwapFor(null)
+  }
+
+  // Add an exercise beyond the plan. Re-adding something swapped away this
+  // session undoes the swap; re-adding something removed cancels the
+  // removal (and its swap pairing) — each path resurfaces the exercise
+  // instead of silently doing nothing.
+  function addExercise(newEx) {
+    const id = newEx.id
+    if (swaps[id]) {
+      const pairedReplacement = swaps[id].exercise_id
+      setSwaps(deleteSwap(sessionId, id))
+      if (removals.length) {
+        setRemovals(saveRemovals(sessionId, removals.filter((r) => r !== id && r !== pairedReplacement)))
+      }
+    } else if (removals.includes(id)) {
+      const source = Object.entries(swaps).find(([, to]) => to.exercise_id === id)?.[0]
+      const drop = new Set(source ? [id, Number(source)] : [id])
+      setRemovals(saveRemovals(sessionId, removals.filter((r) => !drop.has(r))))
+    } else {
+      setAdds(
+        saveAdds(sessionId, [
+          ...adds,
+          { exercise_id: id, exercise_name: newEx.name, laterality: newEx.laterality },
+        ])
+      )
+    }
+    setAddOpen(false)
+  }
+
+  function requestRemove(exercise) {
+    setSwapFor(null)
+    const recorded = sets.filter((s) => s.exercise_id === exercise.exercise_id && s.recorded)
+    if (recorded.length > 0) {
+      setConfirmRemove({ exercise, count: recorded.length })
+      return
+    }
+    doRemove(exercise)
+  }
+
+  function doRemove(exercise) {
+    const exerciseId = exercise.exercise_id
+    // Silence pending writes FIRST (debounce timers, offline-queued
+    // mutations) — otherwise one fires after the DELETE and upserts the set
+    // right back. Then server rows go with the card; cache-only rows are
+    // dropped locally and the removal filter keeps the card hidden if a
+    // request already on the wire lands late.
+    cancelPendingFor(exerciseId)
+    for (const s of sets.filter((x) => x.exercise_id === exerciseId && x.id != null)) {
+      deleteSet.mutate(s)
+    }
+    queryClient.setQueryData(['session', sessionId], (old) =>
+      old ? { ...old, sets: old.sets.filter((x) => x.exercise_id !== exerciseId) } : old
+    )
+    if (adds.some((a) => a.exercise_id === exerciseId)) {
+      // Removing a session-add just retires the add.
+      setAdds(saveAdds(sessionId, adds.filter((a) => a.exercise_id !== exerciseId)))
+    } else {
+      // Removing a swapped-in exercise removes the underlying slot too, so
+      // the original neither reappears nor escapes the save-time diff.
+      const swapSource = Object.entries(swaps).find(([, to]) => to.exercise_id === exerciseId)?.[0]
+      const ids = swapSource ? [exerciseId, Number(swapSource)] : [exerciseId]
+      setRemovals(saveRemovals(sessionId, [...removals, ...ids]))
+    }
+    setDraftAdj((a) => ({ ...a, [exerciseId]: undefined }))
+    setConfirmRemove(null)
   }
 
   function graduate(draftSet, patch) {
@@ -313,8 +441,10 @@ export default function WorkoutSession() {
       return
     }
     const prev = sets.find((s) => setKey(s) === setKey(set))
-    if (prev?.recorded && set.recorded === false) {
+    if (!editMode && prev?.recorded && set.recorded === false) {
       // Un-recording the set that started the rest clock: kill the clock.
+      // Never in edit mode — the clock (and its push alarm) may belong to a
+      // live workout minimized behind this one.
       dismissTimer()
     }
     syncSet(set)
@@ -382,13 +512,91 @@ export default function WorkoutSession() {
     toast('Note saved')
   }
 
-  // Finish = the celebration moment. Tally the recorded sets into a summary
-  // sheet; the session actually closes when the sheet is dismissed.
+  function saveNotes() {
+    setSavingNotes(true)
+    api
+      .updateSession(sessionId, { notes: notesDraft.trim() })
+      .then((res) => {
+        queryClient.setQueryData(['session', sessionId], (old) =>
+          old ? { ...old, session: { ...old.session, ...res.session } } : old
+        )
+        setNotesOpen(false)
+        toast('Notes saved', 'success')
+      })
+      .catch((err) => toast(err.message))
+      .finally(() => setSavingNotes(false))
+  }
+
+  // Did this visit change anything structural? Edit mode prompts (and
+  // toasts) only for drift the lifter caused NOW — a workout from weeks ago
+  // whose extra sets predate this visit is history, not a pending question.
+  function changedThisVisit() {
+    const base = entryBaseline.current
+    if (!base) return false
+    const editsSig = JSON.stringify({ swaps, adds, removals })
+    if (editsSig !== base.editsSig) return true
+    return [...recordedCountsMap().entries()].some(([id, n]) => n !== (base.counts[id] || 0))
+  }
+
+  // Finish/Done editing: if the workout drifted from the program as written,
+  // ask ONCE whether the plan follows — then close out as usual.
   function finish() {
+    const hasWork = sets.some((s) => s.recorded)
+    const eligible = editMode ? changedThisVisit() : hasWork
+    const changes = eligible
+      ? diffPlan({ template: dayExercises, final: exerciseOrder, recordedCounts: recordedCountsMap(), adds, removals })
+      : null
+    if (changes) {
+      // An already-answered prompt (same drift) doesn't re-ask — repeat
+      // Done-editing taps after "This workout only" would otherwise nag.
+      const sig = JSON.stringify(changes.map((c) => c.label))
+      if (sessionStorage.getItem(resolvedKey) !== sig) {
+        setScopePrompt(changes)
+        return
+      }
+    }
+    completeFinish()
+  }
+
+  function resolveScope(applyForward) {
+    if (!applyForward) {
+      sessionStorage.setItem(resolvedKey, JSON.stringify(scopePrompt.map((c) => c.label)))
+      setScopePrompt(null)
+      completeFinish()
+      return
+    }
+    setSavingScope(true)
+    api
+      .updateDayExercises(meta.training_day_id, {
+        exercises: buildFuturePlan({
+          template: dayExercises,
+          final: exerciseOrder,
+          recordedCounts: recordedCountsMap(),
+          adds,
+          swaps,
+        }),
+      })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['session', sessionId] })
+        queryClient.invalidateQueries({ queryKey: ['suggestions', meta.training_day_id] })
+        toast(`${meta.day_label} plan updated`, 'success')
+        setScopePrompt(null)
+        completeFinish()
+      })
+      .catch((err) => toast(err.message)) // stays open — "This workout only" still works offline
+      .finally(() => setSavingScope(false))
+  }
+
+  // The celebration moment (or, in edit mode, a quiet exit). The session
+  // actually closes when the summary sheet is dismissed.
+  function completeFinish() {
     if (editMode) {
+      const touched = changedThisVisit()
       sessionStorage.removeItem(editKey)
-      toast('Workout updated')
-      navigate(`/sessions/${sessionId}`)
+      sessionStorage.removeItem(resolvedKey)
+      clearPlanEdits(sessionId)
+      if (touched) toast('Workout updated')
+      navigate(exitTo)
       return
     }
     const allSets = session.data?.sets || []
@@ -413,6 +621,7 @@ export default function WorkoutSession() {
       const sugg = suggestionByExercise.get(id)
       return sugg && !sugg.last_performance && !sugg.last_sets?.length
     }).length
+    setSummaryNote(meta?.notes || '')
     setSummary({
       sets: recorded.length,
       exercises: exerciseIds.length,
@@ -432,32 +641,47 @@ export default function WorkoutSession() {
 
   function saveSummaryNote() {
     const text = summaryNote.trim()
-    if (text) api.updateSession(sessionId, { notes: text }).catch(() => {})
+    if (!text) return
+    api.updateSession(sessionId, { notes: text }).catch(() => {})
+    // Mirror into the cache so "View workout" (edit-in-place) shows the
+    // note it just saved instead of the stale pre-finish value.
+    queryClient.setQueryData(['session', sessionId], (old) =>
+      old ? { ...old, session: { ...old.session, notes: text } } : old
+    )
   }
 
   function closeOut() {
     saveSummaryNote()
     localStorage.removeItem(ACTIVE_SESSION_KEY)
-    clearSwaps(sessionId)
+    clearPlanEdits(sessionId)
+    sessionStorage.removeItem(resolvedKey)
     dismissTimer()
     navigate('/')
   }
 
+  // "View workout" on the finish sheet: same page, same view — the sheet
+  // drops and the logger flips into edit mode in place (clearing the active
+  // marker makes the derived editMode true). Session-local plan edits stay
+  // so the display doesn't shift under the lifter; they clear on exit.
   function closeOutToSession() {
     saveSummaryNote()
     localStorage.removeItem(ACTIVE_SESSION_KEY)
-    clearSwaps(sessionId)
     dismissTimer()
-    navigate(`/sessions/${sessionId}`)
+    setSummary(null)
+    sessionStorage.setItem(editKey, '1')
   }
 
   // Minimize (not close): the session and rest timer stay live, and the
   // ActiveWorkoutBar mini-bar keeps it one tap away from every tab. In edit
-  // mode the chevron simply returns to the record.
+  // mode the chevron simply goes back — uncommitted structural edits are
+  // discarded ("Done editing" is the save point), or they'd haunt the
+  // record as phantom cards forever.
   function minimize() {
     if (editMode) {
       sessionStorage.removeItem(editKey)
-      navigate(`/sessions/${sessionId}`)
+      sessionStorage.removeItem(resolvedKey)
+      clearPlanEdits(sessionId)
+      navigate(exitTo)
       return
     }
     navigate('/')
@@ -466,12 +690,14 @@ export default function WorkoutSession() {
   function discardWorkout() {
     api.deleteSession(sessionId).catch(() => {})
     localStorage.removeItem(ACTIVE_SESSION_KEY)
-    clearSwaps(sessionId)
+    clearPlanEdits(sessionId)
+    sessionStorage.removeItem(resolvedKey)
     dismissTimer()
     navigate('/')
   }
 
   const startedAtDate = meta?.performed_at ? new Date(meta.performed_at) : null
+  const excludeIds = new Set(exerciseOrder.map((e) => e.exercise_id))
 
   return (
     <div className="space-y-4 pb-20">
@@ -480,7 +706,7 @@ export default function WorkoutSession() {
           <button
             onClick={minimize}
             aria-label="Minimize workout"
-            title={editMode ? 'Back to the workout record' : 'Minimize — keeps the workout going'}
+            title={editMode ? 'Back' : 'Minimize — keeps the workout going'}
             className="-ml-2.5 grid h-11 w-11 shrink-0 place-items-center rounded-full text-ink-3 transition-colors hover:bg-sunken hover:text-ink active:scale-95"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -544,16 +770,52 @@ export default function WorkoutSession() {
         />
       ))}
 
+      <button
+        type="button"
+        onClick={() => setAddOpen(true)}
+        className="min-h-12 w-full rounded-card border border-dashed border-line-2 text-sm font-medium text-accent transition-colors active:bg-wash"
+      >
+        + Add exercise
+      </button>
+
+      <div className="rounded-card border border-line bg-card p-4 shadow-card">
+        <div className="mb-1 flex items-center justify-between">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-2">Notes</h3>
+          <button
+            onClick={() => { setNotesDraft(meta?.notes || ''); setNotesOpen(true) }}
+            className="min-h-11 px-2 py-1 text-[13px] font-medium text-accent"
+          >
+            {meta?.notes ? 'Edit notes' : 'Add notes'}
+          </button>
+        </div>
+        {meta?.notes ? (
+          <p className="whitespace-pre-wrap text-sm text-ink-2">{meta.notes}</p>
+        ) : (
+          <p className="text-sm text-ink-3">How did it go? Sleep, pump, pain — future you will want to know.</p>
+        )}
+      </div>
+
       <SwapSheet
         open={!!swapFor}
         exercise={swapFor}
-        excludeIds={new Set(exerciseOrder.map((e) => e.exercise_id))}
-        canPersist={!!swapFor && dayExercises.some((e) => e.exercise_id === swapFor.exercise_id)}
-        onSwap={performSwap}
+        excludeIds={excludeIds}
+        onPick={performSwap}
+        onRemove={requestRemove}
         onClose={() => setSwapFor(null)}
       />
 
-      <RestTimer endsAt={timerEndsAt} onDismiss={dismissTimer} onAdjust={adjustTimer} />
+      <SwapSheet
+        open={addOpen}
+        mode="add"
+        excludeIds={excludeIds}
+        onPick={addExercise}
+        onClose={() => setAddOpen(false)}
+      />
+
+      {/* Never in edit mode: the global rest clock belongs to the live
+          workout — showing it here invites dismissing another workout's
+          alarm. */}
+      {!editMode && <RestTimer endsAt={timerEndsAt} onDismiss={dismissTimer} onAdjust={adjustTimer} />}
       {platesFor != null && (
         <PlateCalculator open onClose={() => setPlatesFor(null)} initialWeight={platesFor} />
       )}
@@ -568,6 +830,19 @@ export default function WorkoutSession() {
           deleteSet.mutate(confirmDelete)
         }}
         onClose={() => setConfirmDelete(null)}
+      />
+
+      <ConfirmSheet
+        open={!!confirmRemove}
+        title="Remove this exercise?"
+        body={
+          confirmRemove
+            ? `${confirmRemove.exercise.exercise_name} has ${confirmRemove.count} logged ${confirmRemove.count === 1 ? 'set' : 'sets'} in this workout — removing it deletes them.`
+            : ''
+        }
+        confirmLabel="Remove exercise"
+        onConfirm={() => doRemove(confirmRemove.exercise)}
+        onClose={() => setConfirmRemove(null)}
       />
 
       <ConfirmSheet
@@ -597,6 +872,49 @@ export default function WorkoutSession() {
             <Button onClick={saveNote} className="w-full min-h-12">
               Save note
             </Button>
+          </div>
+        )}
+      </BottomSheet>
+
+      <BottomSheet open={notesOpen} onClose={() => setNotesOpen(false)} title="Session notes">
+        <div className="space-y-4">
+          <textarea
+            value={notesDraft}
+            onChange={(e) => setNotesDraft(e.target.value)}
+            rows={5}
+            maxLength={2000}
+            autoFocus
+            placeholder="Bench felt heavy, slept 5h. Swapped rows for pull-ups."
+            className="w-full rounded-field border border-line-2 bg-raised px-3 py-2.5 text-[15px] text-ink placeholder:text-ink-4 transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
+          />
+          <Button onClick={saveNotes} disabled={savingNotes} className="w-full min-h-12">
+            {savingNotes ? 'Saving…' : 'Save notes'}
+          </Button>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet open={!!scopePrompt} onClose={() => setScopePrompt(null)} title="You went off-plan">
+        {scopePrompt && (
+          <div className="space-y-4">
+            <p className="text-sm text-ink-2">This workout drifted from the {meta?.day_label} plan:</p>
+            <ul className="space-y-1.5 rounded-field bg-sunken px-3 py-2.5">
+              {scopePrompt.map((c) => (
+                <li key={c.label} className="text-sm text-ink">
+                  {c.label}
+                </li>
+              ))}
+            </ul>
+            <p className="text-[13px] text-ink-3">
+              Keep it as a one-off, or make this the new {meta?.day_label} plan going forward?
+            </p>
+            <div className="space-y-2">
+              <Button onClick={() => resolveScope(false)} disabled={savingScope} className="w-full min-h-12">
+                This workout only
+              </Button>
+              <Button variant="secondary" onClick={() => resolveScope(true)} disabled={savingScope} className="w-full min-h-12">
+                {savingScope ? 'Saving…' : 'All future workouts'}
+              </Button>
+            </div>
           </div>
         )}
       </BottomSheet>

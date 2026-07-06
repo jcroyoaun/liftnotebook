@@ -128,6 +128,12 @@ export default function ExerciseLogCard({
           </div>
         )}
 
+        {exercise.added_in_session && !exercise.swapped_from && (
+          <div className="mt-1 text-[11px] text-ink-3">
+            Added this session — beyond the plan
+          </div>
+        )}
+
         {suggestion && (
           <div className="mt-1.5 text-xs">
             {/* No rep prescriptions — failure decides the reps. Weight is the only cue. */}

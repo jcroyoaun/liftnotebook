@@ -116,20 +116,23 @@ test.describe.serial('Unilateral sets, exercise notes, history', () => {
       }, { timeout: 10000 })
       .toBe(true)
 
-    // Visible on the read-only record too.
+    // Legacy /sessions links land back in the same logger view.
     await seedPage(page, `/sessions/${sessionId}`)
+    await expect(page).toHaveURL(`/workout/${sessionId}`)
     await expect(page.locator('text=Panatta taken')).toBeVisible()
   })
 
-  test('History tab lists the workout and opens its record', async ({ page }) => {
+  test('History tab lists the workout and opens it in the logger', async ({ page }) => {
     await seedPage(page, '/')
     await page.click('nav >> text=History')
     await expect(page).toHaveURL('/history')
 
+    // One view per workout: the row opens the logger in edit mode.
     const row = page.locator('a').filter({ hasText: 'Legs' }).first()
     await expect(row).toBeVisible()
     await row.click()
-    await expect(page).toHaveURL(`/sessions/${sessionId}`)
+    await expect(page).toHaveURL(`/workout/${sessionId}`)
+    await expect(page.getByRole('button', { name: 'Done editing' })).toBeVisible()
   })
 
   test('next session shows dated last-time line, per-set ghost, and past note', async ({ page }) => {
@@ -164,7 +167,8 @@ test.describe.serial('Unilateral sets, exercise notes, history', () => {
     await expect(dayCard.locator('text=R60/L55×8')).toBeVisible()
     await expect(dayCard.locator('text=Panatta taken')).toBeVisible()
 
-    // Per-exercise notes are editable straight from the workout record.
+    // Per-exercise notes are editable straight from the workout view (a
+    // legacy /sessions link lands there in edit mode).
     await seedPage(page, `/sessions/${sessionId}`)
     await page.getByRole('button', { name: 'note Single Leg Leg Press' }).click()
     const sheet = page.getByRole('dialog')

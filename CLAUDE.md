@@ -58,9 +58,19 @@ are just different per-exercise target values.
 - Mobile-first: bottom tab bar (Today / History / Programs / Progress), FocusLayout for
   active workouts, safe-area padding. An in-progress workout is minimizable
   (chevron in the logger header) — `ActiveWorkoutBar` docks a persistent
-  mini-bar above the tab bar until Finish. `/sessions/:id` is the read-only
-  view of a logged workout; `/workout/:id` is the only editable surface.
-  Dashboard days always render in program order (badge moves, cards don't).
+  mini-bar above the tab bar until Finish.
+- ONE VIEW PER WORKOUT (owner's law, 2026-07-06): the logger (`/workout/:id`)
+  is the ONLY view of a workout — History rows, done day cards, Progress rows
+  and recent-workout lists all open it directly (edit mode for finished
+  sessions, live for the active one). `/sessions/:id` survives only as a
+  redirect. The logger supports the full range: log/edit sets, swap/add/remove
+  exercises (session-local in localStorage via `features/workout/swaps.js`),
+  session + per-exercise notes. Plan drift (swap/add/remove/extra recorded
+  sets) is reconciled ONCE, at save time, via the scope prompt: "This workout
+  only" / "All future workouts" (the latter rewrites the day template).
+  Never reintroduce a separate view-vs-edit representation of a workout.
+  Dashboard days always render in program order (badge moves, cards don't);
+  done/in-progress day cards hide "Edit plan" (the workout is the surface).
 - E2E locators are copy-based — keep visible copy stable or update
   `e2e/*.spec.js` in the same commit.
 
@@ -167,6 +177,14 @@ are just different per-exercise target values.
   removed. e2e: 36 tests incl. e2e/bench-features.spec.js. NOTE: seed.sql
   re-applies the laterality backfill for fresh envs (migration runs before
   seed).
+
+- ✅ One-workout-view batch (2026-07-06): killed the read-only /sessions/:id
+  page (now a redirect); every workout surface opens the logger (edit mode
+  inferred data-side for finished sessions — never trusts router state
+  alone); logger gained add/remove exercise + session-notes card; plan
+  drift reconciles once at save via the scope prompt (This workout only /
+  All future workouts); tonnage fully purged from the backend
+  (total_volume_kg dropped from GET /v1/me/sessions). e2e: 38 tests.
 
 ### Next up
 
