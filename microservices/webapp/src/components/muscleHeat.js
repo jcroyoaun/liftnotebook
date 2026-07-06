@@ -20,6 +20,7 @@ export const MUSCLE_TO_REGION = {
   'Posterior Deltoid': ['back', 'rdelts'],
   'Latissimus Dorsi': ['back', 'lats'],
   'Rhomboids': ['back', 'midback'],
+  'Upper Trapezius': ['back', 'traps'],
   'Middle Trapezius': ['back', 'traps'],
   'Lower Trapezius': ['back', 'traps'],
   'Erector Spinae': ['back', 'erectors'],

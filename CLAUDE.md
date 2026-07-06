@@ -200,6 +200,16 @@ are just different per-exercise target values.
   plan" now opens the logger (edit-mode session on demand, husk deleted on
   exit) — SetupDayExercises is creation-only. e2e: 40 tests.
 
+- ✅ Catalog muscle-mapping audit (2026-07-06): migration 000011 — added
+  Upper Trapezius muscle (traps region); fixed chin-ups (had zero
+  secondaries), Front Foot Split Squat (only 1 of 3 quad heads), sumo
+  adductors, hamstring-head normalization (credit all 3 heads at a tier),
+  grip/forearms on loaded pulls, Machine Deadlift hamstring tier, Dumbbell
+  Pullover → isolation, plus row/curl/back-extension consistency fixes.
+  Migration is BY-NAME (prod exercise ids ≠ seed.sql ids); dumps/seed.sql
+  mirrors it by seed ids. Verified both paths converge to byte-identical
+  catalogs (222 rows). muscleHeat.js maps Upper Trapezius → traps region.
+
 ### Next up
 
 - Email self-service password reset via Resend (owner creates the account +

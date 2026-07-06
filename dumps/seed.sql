@@ -53,10 +53,11 @@ INSERT INTO muscles (id, name, body_part) VALUES
 (25, 'Obliques', 'core'),
 (26, 'Transverse Abdominis', 'core'),
 (27, 'Forearm Flexors & Extensors', 'forearms'),
-(28, 'Hip Adductors', 'adductors')
+(28, 'Hip Adductors', 'adductors'),
+(29, 'Upper Trapezius', 'traps')
 ON CONFLICT (id) DO NOTHING;
 
-SELECT setval('muscles_id_seq', 28, true);
+SELECT setval('muscles_id_seq', 29, true);
 
 -- Exercises
 INSERT INTO exercises (id, name, type, movement_pattern_id) VALUES
@@ -74,7 +75,7 @@ INSERT INTO exercises (id, name, type, movement_pattern_id) VALUES
 (12, 'Incline Barbell Bench Press', 'compound', 9),
 (13, 'Machine Chest Press', 'compound', 9),
 (14, 'Hip Thrust', 'compound', 10),
-(15, 'Dumbbell Pullover', 'compound', 11),
+(15, 'Dumbbell Pullover', 'isolation', 11),
 (16, 'Dumbbell Fly', 'isolation', 12),
 (17, 'Preacher Bicep Curl', 'isolation', 14),
 (18, 'Incline Bicep Curl', 'isolation', 14),
@@ -281,6 +282,40 @@ INSERT INTO exercise_muscles (exercise_id, muscle_id, target_type) VALUES
 (58, 14, 'primary'), (58, 15, 'primary'), (58, 16, 'primary'),
 -- Single Leg Leg Curl
 (59, 17, 'primary'), (59, 18, 'primary'), (59, 19, 'primary')
+ON CONFLICT (exercise_id, muscle_id) DO NOTHING;
+
+-- Muscle-mapping audit repairs (mirrors migration 000011). Seed exercise ids
+-- differ from prod, so these reference seed's own ids; muscle ids are shared.
+-- Upper Trapezius = 29, Semitendinosus = 18, Semimembranosus = 19,
+-- Hip Adductors = 28, Forearm Flexors & Extensors = 27, Brachialis = 13.
+INSERT INTO exercise_muscles (exercise_id, muscle_id, target_type) VALUES
+-- Chin-ups: add the missing vertical-pull secondaries (rhomboids/mid-trap/brachialis)
+(7, 4, 'secondary'), (7, 5, 'secondary'), (7, 13, 'secondary'),
+(42, 4, 'secondary'), (42, 5, 'secondary'), (42, 13, 'secondary'),
+-- Front Foot Elevated Split Squat: complete the quads + add hamstring/erector secondary
+(22, 15, 'primary'), (22, 16, 'primary'),
+(22, 17, 'secondary'), (22, 18, 'secondary'), (22, 19, 'secondary'), (22, 7, 'secondary'),
+-- Hamstring-head normalization (credit all three heads at the existing tier)
+(1, 18, 'secondary'), (1, 19, 'secondary'),
+(3, 18, 'primary'), (3, 19, 'primary'),
+(4, 18, 'primary'), (4, 19, 'primary'),
+(14, 18, 'secondary'), (14, 19, 'secondary'),
+(43, 18, 'secondary'), (43, 19, 'secondary'),
+(49, 18, 'secondary'), (49, 19, 'secondary'),
+(44, 18, 'primary'), (44, 19, 'primary'),
+-- Adductors on the deep bilateral squats + sumo
+(1, 28, 'secondary'), (2, 28, 'secondary'), (3, 28, 'secondary'),
+-- Grip on the loaded pulls + hammer curls
+(3, 27, 'secondary'), (4, 27, 'secondary'), (5, 27, 'secondary'),
+(44, 27, 'secondary'), (41, 27, 'secondary'),
+-- Upper traps: press, deadlift holds, Kelso shrug
+(9, 29, 'secondary'), (3, 29, 'secondary'), (4, 29, 'secondary'),
+(44, 29, 'secondary'), (51, 29, 'secondary'),
+-- Consistency fixes
+(19, 13, 'secondary'),
+(26, 7, 'secondary'),
+(32, 13, 'secondary'), (32, 5, 'secondary'),
+(40, 10, 'secondary')
 ON CONFLICT (exercise_id, muscle_id) DO NOTHING;
 
 -- Laterality backfill (mirrors migration 000009): on fresh environments the
