@@ -10,10 +10,14 @@ import (
 )
 
 type Mesocycle struct {
-	ID          int64      `json:"id"`
-	UserID      int64      `json:"user_id"`
-	Name        string     `json:"name"`
-	DaysPerWeek int        `json:"days_per_week"`
+	ID          int64  `json:"id"`
+	UserID      int64  `json:"user_id"`
+	Name        string `json:"name"`
+	DaysPerWeek int    `json:"days_per_week"`
+	// CurrentWeek is the lifter's own week counter — training weeks are
+	// user-defined, never calendar-anchored. Advanced explicitly via
+	// POST /v1/mesocycles/:id/advance-week.
+	CurrentWeek int        `json:"current_week"`
 	StartedAt   time.Time  `json:"started_at"`
 	EndedAt     *time.Time `json:"ended_at"`
 	CreatedAt   time.Time  `json:"-"`
@@ -35,19 +39,42 @@ func (m MesocycleModel) Insert(meso *Mesocycle) error {
 	query := `
 		INSERT INTO mesocycles (user_id, name, days_per_week)
 		VALUES ($1, $2, $3)
-		RETURNING id, started_at, created_at, version`
+		RETURNING id, current_week, started_at, created_at, version`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	return m.DB.QueryRowContext(ctx, query, meso.UserID, meso.Name, meso.DaysPerWeek).Scan(
-		&meso.ID, &meso.StartedAt, &meso.CreatedAt, &meso.Version,
+		&meso.ID, &meso.CurrentWeek, &meso.StartedAt, &meso.CreatedAt, &meso.Version,
 	)
+}
+
+// AdvanceWeek bumps the block's user-defined week counter — the ONLY way a
+// new training week starts. Ended blocks can't advance.
+func (m MesocycleModel) AdvanceWeek(id, userID int64) (int, error) {
+	query := `
+		UPDATE mesocycles
+		SET current_week = current_week + 1, version = version + 1
+		WHERE id = $1 AND user_id = $2 AND ended_at IS NULL
+		RETURNING current_week`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	var week int
+	err := m.DB.QueryRowContext(ctx, query, id, userID).Scan(&week)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, ErrRecordNotFound
+		}
+		return 0, err
+	}
+	return week, nil
 }
 
 func (m MesocycleModel) Get(id, userID int64) (*Mesocycle, error) {
 	query := `
-		SELECT id, user_id, name, days_per_week, started_at, ended_at, created_at, version
+		SELECT id, user_id, name, days_per_week, current_week, started_at, ended_at, created_at, version
 		FROM mesocycles
 		WHERE id = $1 AND user_id = $2`
 
@@ -57,7 +84,7 @@ func (m MesocycleModel) Get(id, userID int64) (*Mesocycle, error) {
 	defer cancel()
 
 	err := m.DB.QueryRowContext(ctx, query, id, userID).Scan(
-		&meso.ID, &meso.UserID, &meso.Name, &meso.DaysPerWeek,
+		&meso.ID, &meso.UserID, &meso.Name, &meso.DaysPerWeek, &meso.CurrentWeek,
 		&meso.StartedAt, &meso.EndedAt, &meso.CreatedAt, &meso.Version,
 	)
 	if err != nil {
@@ -71,7 +98,7 @@ func (m MesocycleModel) Get(id, userID int64) (*Mesocycle, error) {
 
 func (m MesocycleModel) GetActive(userID int64) (*Mesocycle, error) {
 	query := `
-		SELECT id, user_id, name, days_per_week, started_at, ended_at, created_at, version
+		SELECT id, user_id, name, days_per_week, current_week, started_at, ended_at, created_at, version
 		FROM mesocycles
 		WHERE user_id = $1 AND ended_at IS NULL
 		ORDER BY started_at DESC
@@ -83,7 +110,7 @@ func (m MesocycleModel) GetActive(userID int64) (*Mesocycle, error) {
 	defer cancel()
 
 	err := m.DB.QueryRowContext(ctx, query, userID).Scan(
-		&meso.ID, &meso.UserID, &meso.Name, &meso.DaysPerWeek,
+		&meso.ID, &meso.UserID, &meso.Name, &meso.DaysPerWeek, &meso.CurrentWeek,
 		&meso.StartedAt, &meso.EndedAt, &meso.CreatedAt, &meso.Version,
 	)
 	if err != nil {
@@ -97,7 +124,7 @@ func (m MesocycleModel) GetActive(userID int64) (*Mesocycle, error) {
 
 func (m MesocycleModel) ListForUser(userID int64) ([]*Mesocycle, error) {
 	query := `
-		SELECT id, user_id, name, days_per_week, started_at, ended_at, created_at, version
+		SELECT id, user_id, name, days_per_week, current_week, started_at, ended_at, created_at, version
 		FROM mesocycles
 		WHERE user_id = $1
 		ORDER BY started_at DESC`
@@ -115,7 +142,7 @@ func (m MesocycleModel) ListForUser(userID int64) ([]*Mesocycle, error) {
 	for rows.Next() {
 		var meso Mesocycle
 		err := rows.Scan(
-			&meso.ID, &meso.UserID, &meso.Name, &meso.DaysPerWeek,
+			&meso.ID, &meso.UserID, &meso.Name, &meso.DaysPerWeek, &meso.CurrentWeek,
 			&meso.StartedAt, &meso.EndedAt, &meso.CreatedAt, &meso.Version,
 		)
 		if err != nil {

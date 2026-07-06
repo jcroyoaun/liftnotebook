@@ -60,17 +60,25 @@ are just different per-exercise target values.
   (chevron in the logger header) — `ActiveWorkoutBar` docks a persistent
   mini-bar above the tab bar until Finish.
 - ONE VIEW PER WORKOUT (owner's law, 2026-07-06): the logger (`/workout/:id`)
-  is the ONLY view of a workout — History rows, done day cards, Progress rows
-  and recent-workout lists all open it directly (edit mode for finished
-  sessions, live for the active one). `/sessions/:id` survives only as a
-  redirect. The logger supports the full range: log/edit sets, swap/add/remove
-  exercises (session-local in localStorage via `features/workout/swaps.js`),
-  session + per-exercise notes. Plan drift (swap/add/remove/extra recorded
-  sets) is reconciled ONCE, at save time, via the scope prompt: "This workout
-  only" / "All future workouts" (the latter rewrites the day template).
-  Never reintroduce a separate view-vs-edit representation of a workout.
-  Dashboard days always render in program order (badge moves, cards don't);
-  done/in-progress day cards hide "Edit plan" (the workout is the surface).
+  is the ONLY view of a workout — History rows, done day cards, Progress rows,
+  recent-workout lists AND day-card "Edit plan" all open it directly (edit
+  mode for finished sessions, live for the active one; Edit plan creates an
+  edit-mode session on demand and empty husks are deleted on exit).
+  `/sessions/:id` survives only as a redirect; the SetupDayExercises template
+  editor is for BLOCK CREATION only. The logger supports the full range:
+  log/edit sets, swap/add/remove exercises (session-local in localStorage via
+  `features/workout/swaps.js`), session + per-exercise notes. Plan drift
+  (swap/add/remove/extra sets — "+ Add Set" rows count even unrecorded) is
+  reconciled ONCE, at save time, via the scope prompt: "This workout only" /
+  "All future workouts" (the latter rewrites the day template). Never
+  reintroduce a separate view-vs-edit representation of a workout.
+  Dashboard days always render in program order (badge moves, cards don't).
+- TRAINING WEEKS ARE USER-DEFINED (owner's law, 2026-07-06): a week ends when
+  the lifter taps "Start next week" (`POST /v1/mesocycles/:id/advance-week`
+  bumps `mesocycles.current_week`; sessions are stamped with `week_number` at
+  creation). Partial weeks are always allowed. NEVER bucket workouts by
+  calendar weeks/Mondays anywhere — dashboard stats, weekly volume, streaks
+  all key off `week_number`.
 - E2E locators are copy-based — keep visible copy stable or update
   `e2e/*.spec.js` in the same commit.
 
@@ -184,7 +192,13 @@ are just different per-exercise target values.
   alone); logger gained add/remove exercise + session-notes card; plan
   drift reconciles once at save via the scope prompt (This workout only /
   All future workouts); tonnage fully purged from the backend
-  (total_volume_kg dropped from GET /v1/me/sessions). e2e: 38 tests.
+  (total_volume_kg dropped from GET /v1/me/sessions).
+- ✅ User-weeks batch (2026-07-06): migration 000010 (mesocycles.current_week,
+  workout_sessions.week_number backfilled from old Monday buckets); "Start
+  next week" on the dashboard (header link + prominent button when all days
+  done); weekly volume/stats/streak keyed by week_number; day-card "Edit
+  plan" now opens the logger (edit-mode session on demand, husk deleted on
+  exit) — SetupDayExercises is creation-only. e2e: 40 tests.
 
 ### Next up
 

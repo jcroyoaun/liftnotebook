@@ -275,6 +275,21 @@ export default function WorkoutSession() {
     return m
   }
 
+  // What the lifter committed to per exercise: recorded work, grown by
+  // "+ Add Set" rows even when unrecorded — so editing the plan through this
+  // view can raise a set target without logging fake sets.
+  function effectiveCountsMap() {
+    const m = recordedCountsMap()
+    for (const ex of exerciseOrder) {
+      const extra = draftAdj[ex.exercise_id]?.extra || 0
+      if (extra > 0) {
+        const want = (ex.target_sets ?? 2) + extra
+        if (want > (m.get(ex.exercise_id) || 0)) m.set(ex.exercise_id, want)
+      }
+    }
+    return m
+  }
+
   // Materialize the plan as derived draft rows: target_sets minus what's
   // already synced, adjusted by explicit deletes/extras. Drafts are pure
   // prefill — the first touch graduates one into a real (synced) set, which
@@ -535,7 +550,7 @@ export default function WorkoutSession() {
     if (!base) return false
     const editsSig = JSON.stringify({ swaps, adds, removals })
     if (editsSig !== base.editsSig) return true
-    return [...recordedCountsMap().entries()].some(([id, n]) => n !== (base.counts[id] || 0))
+    return [...effectiveCountsMap().entries()].some(([id, n]) => n !== (base.counts[id] || 0))
   }
 
   // Finish/Done editing: if the workout drifted from the program as written,
@@ -544,7 +559,7 @@ export default function WorkoutSession() {
     const hasWork = sets.some((s) => s.recorded)
     const eligible = editMode ? changedThisVisit() : hasWork
     const changes = eligible
-      ? diffPlan({ template: dayExercises, final: exerciseOrder, recordedCounts: recordedCountsMap(), adds, removals })
+      ? diffPlan({ template: dayExercises, final: exerciseOrder, recordedCounts: effectiveCountsMap(), adds, removals })
       : null
     if (changes) {
       // An already-answered prompt (same drift) doesn't re-ask — repeat
@@ -571,7 +586,7 @@ export default function WorkoutSession() {
         exercises: buildFuturePlan({
           template: dayExercises,
           final: exerciseOrder,
-          recordedCounts: recordedCountsMap(),
+          recordedCounts: effectiveCountsMap(),
           adds,
           swaps,
         }),
@@ -592,6 +607,12 @@ export default function WorkoutSession() {
   function completeFinish() {
     if (editMode) {
       const touched = changedThisVisit()
+      // A plan-editing husk (Edit plan opens the logger on an on-demand
+      // session) that never logged anything must not linger as a phantom
+      // workout — same rule as abandoning a live session.
+      if ((session.data?.sets || []).length === 0) {
+        api.deleteSession(sessionId).catch(() => {})
+      }
       sessionStorage.removeItem(editKey)
       sessionStorage.removeItem(resolvedKey)
       clearPlanEdits(sessionId)

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { getUser } from '../auth/session'
-import { getLatestWeeklyVolume } from './dashboardVolume'
+import { getWeekVolume } from './dashboardVolume'
 import ExerciseDetailButton from '../components/ExerciseDetailButton'
 import StatTile from '../components/ui/StatTile'
 import Button from '../components/ui/Button'
@@ -42,7 +42,7 @@ export default function Dashboard() {
       setDays(data.days || [])
 
       if (data.mesocycle && data.days?.length) {
-        loadVolume(data.mesocycle.id, data.days)
+        loadVolume(data.mesocycle, data.days)
         api.getMesocycleSessions(data.mesocycle.id)
           .then(d => setSessions(d.sessions || []))
           .catch(err => console.error('Sessions error:', err))
@@ -54,7 +54,8 @@ export default function Dashboard() {
     }
   }
 
-  async function loadVolume(mesoId, daysList) {
+  async function loadVolume(mesoData, daysList) {
+    const mesoId = mesoData.id
     // Build projected volume from all training day templates
     const allExercises = daysList.flatMap(d =>
       (d.exercises || []).map(e => ({ exercise_id: e.exercise_id, sets: e.target_sets }))
@@ -72,9 +73,47 @@ export default function Dashboard() {
 
     try {
       const data = await api.getWeeklyVolume(mesoId)
-      setActualVolume(getLatestWeeklyVolume(data.weekly_volume || []))
+      // The lifter's CURRENT user-defined week — a fresh week correctly
+      // shows zeros, it never falls back to last week's bars.
+      setActualVolume(getWeekVolume(data.weekly_volume || [], mesoData.current_week ?? 1))
     } catch (err) {
       console.error('Actual volume error:', err)
+    }
+  }
+
+  // One view per workout (owner's law): "Edit plan" opens the day's workout
+  // view — an edit-mode session created on demand. Nothing logged = the husk
+  // is deleted on exit; structural changes flow through the save prompt.
+  async function editPlanInLogger(day) {
+    setStarting(day.id)
+    try {
+      const currentWeek = meso.current_week ?? 1
+      const existing = sessions.find(
+        s => s.training_day_id === day.id && (s.week_number ?? 1) === currentWeek
+      )
+      let sid = existing?.id
+      if (!sid) {
+        const data = await api.createSession({ mesocycle_id: meso.id, training_day_id: day.id })
+        sid = data.session.id
+      }
+      navigate(`/workout/${sid}`, { state: { edit: true } })
+    } catch (err) {
+      toast(err.message)
+    } finally {
+      setStarting(null)
+    }
+  }
+
+  // The week ends when the lifter says so — this is the only way a new week
+  // starts. Partial weeks are fine; nothing is ever forced by the calendar.
+  async function advanceWeek() {
+    try {
+      const data = await api.advanceWeek(meso.id)
+      setConfirmAction(null)
+      toast(`Week ${data.current_week} — fresh page`, 'success')
+      await loadActive()
+    } catch (err) {
+      toast(err.message)
     }
   }
 
@@ -211,12 +250,12 @@ export default function Dashboard() {
   // mark a day done, advance "Up next", or pad the stats.
   const trained = sessions.filter(s => (s.recorded_sets ?? 0) > 0)
 
-  // Week stats
-  const weekNumber = Math.max(1, Math.floor((Date.now() - new Date(meso.started_at).getTime()) / (7 * 86400_000)) + 1)
-  const weekStart = new Date()
-  weekStart.setHours(0, 0, 0, 0)
-  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)) // Monday
-  const weekSessions = trained.filter(s => new Date(s.performed_at) >= weekStart)
+  // Week stats. Training weeks are USER-DEFINED (owner's law): a week ends
+  // when the lifter taps "Start next week", never on a calendar boundary.
+  // Nobody is forced to start on Monday or to complete every day before
+  // moving on. NEVER reintroduce Date-based week math here.
+  const currentWeek = meso.current_week ?? 1
+  const weekSessions = trained.filter(s => (s.week_number ?? 1) === currentWeek)
   // Actual sets logged this week — not per-muscle volume credit (a set that
   // works two muscles still counts once here; the volume table below keeps
   // the credited framing).
@@ -226,15 +265,18 @@ export default function Dashboard() {
   const doneDayIds = new Set(weekSessions.map(s => s.training_day_id))
   const workoutsThisWeek = doneDayIds.size
 
-  // Consistency streak: consecutive Monday-weeks with at least one workout,
-  // counting back from this week. A quiet current week doesn't break the
-  // streak until it's over — last week's streak carries through.
-  const WEEK_MS = 7 * 86400_000
-  const weeksWithSessions = new Set(
-    trained.map(s => Math.floor((new Date(s.performed_at).getTime() - weekStart.getTime()) / WEEK_MS))
-  ) // 0 = this week, -1 = last week, ...
+  // Consistency streak: consecutive user-weeks with at least one workout,
+  // counting back from the current week. A quiet current week doesn't break
+  // the streak until it's over — last week's streak carries through.
+  const weeksWithSessions = new Set(trained.map(s => s.week_number ?? 1))
   let streakWeeks = 0
-  for (let w = weeksWithSessions.has(0) ? 0 : -1; weeksWithSessions.has(w); w--) streakWeeks++
+  for (
+    let w = weeksWithSessions.has(currentWeek) ? currentWeek : currentWeek - 1;
+    w >= 1 && weeksWithSessions.has(w);
+    w--
+  ) streakWeeks++
+
+  const allDaysDone = days.length > 0 && days.every(d => doneDayIds.has(d.id))
 
   // Suggested next day: the one after the most recently logged session
   // (cyclic). Days always render in program order — this only places a badge
@@ -285,7 +327,7 @@ export default function Dashboard() {
           </div>
         </div>
         <h2 className="font-display text-[28px] font-semibold leading-tight text-ink">{meso.name}</h2>
-        <p className="mt-0.5 text-sm text-ink-3">Week {weekNumber} · {meso.days_per_week} days/week</p>
+        <p className="mt-0.5 text-sm text-ink-3">Week {currentWeek} · {meso.days_per_week} days/week</p>
         <div className="mt-3">
           <div className="h-1 overflow-hidden rounded-full bg-line">
             <div
@@ -315,7 +357,24 @@ export default function Dashboard() {
           default; every card expands/collapses independently. */}
       {sortedDays.length > 0 && (
         <div>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-2">This block</h3>
+          <div className="mb-2 flex items-baseline justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-2">This block</h3>
+            {/* The week ends when the lifter says so — always reachable,
+                even mid-week with days left undone. */}
+            {workoutsThisWeek > 0 && !allDaysDone && (
+              <button
+                onClick={() => setConfirmAction('advance')}
+                className="min-h-8 text-[13px] font-medium text-accent"
+              >
+                Start next week →
+              </button>
+            )}
+          </div>
+          {allDaysDone && (
+            <Button className="mb-2.5 w-full min-h-12" onClick={() => setConfirmAction('advance')}>
+              Week {currentWeek} done — start week {currentWeek + 1} →
+            </Button>
+          )}
           <div className="space-y-2.5">
             {sortedDays.map(day => {
               const isDone = doneDayIds.has(day.id)
@@ -376,18 +435,19 @@ export default function Dashboard() {
                             Up next
                           </span>
                         )}
-                        {/* One view per workout: once a workout exists for
-                            the day (running or done), the logger is the only
-                            surface — plan changes happen there and propagate
-                            via the save prompt. Edit plan is for days whose
-                            workout doesn't exist yet. */}
+                        {/* One view per workout: Edit plan ALSO opens the
+                            logger (an edit-mode session for the day, created
+                            on demand). The template editor page exists only
+                            inside block creation. Done/running days already
+                            route through their workout. */}
                         {!activeForDay && !isDone && (
-                          <Link
-                            to={`/programs/${meso.id}/setup/${day.id}`}
-                            className="min-h-8 rounded-btn px-2 py-1 text-xs font-medium text-ink-3 transition-colors hover:bg-sunken hover:text-ink-2"
+                          <button
+                            onClick={() => editPlanInLogger(day)}
+                            disabled={starting === day.id}
+                            className="min-h-8 rounded-btn px-2 py-1 text-xs font-medium text-ink-3 transition-colors hover:bg-sunken hover:text-ink-2 disabled:opacity-50"
                           >
                             Edit plan
-                          </Link>
+                          </button>
                         )}
                         {!open && (
                           activeForDay ? (
@@ -601,6 +661,14 @@ export default function Dashboard() {
         </div>
       </BottomSheet>
 
+      <ConfirmSheet
+        open={confirmAction === 'advance'}
+        title={`Start week ${(meso.current_week ?? 1) + 1}?`}
+        body="Your week ends when you say so — done days reset for the new week, and everything you logged stays in the books."
+        confirmLabel="Start next week"
+        onConfirm={advanceWeek}
+        onClose={() => setConfirmAction(null)}
+      />
       <ConfirmSheet
         open={confirmAction === 'end'}
         title="End this training block?"

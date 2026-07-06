@@ -46,14 +46,6 @@ function PointLabel({ x, y, index, value, count, fill, mutedFill }) {
   )
 }
 
-// week_start is a date-only fact ('2026-06-29T00:00:00Z'); new Date() on the
-// full string shifts it a day for UTC-negative users. Build a local date from
-// the y/m/d instead so the label reads the actual Monday.
-function parseDateOnly(s) {
-  const [y, m, d] = String(s).slice(0, 10).split('-').map(Number)
-  return new Date(y, m - 1, d)
-}
-
 function VolumeTooltip({ active, payload }) {
   if (!active || !payload?.length) return null
   const p = payload[0].payload
@@ -88,8 +80,9 @@ export default function Progress() {
       .then(([exs, weeklyVolume]) => {
         setExercises(exs)
         setWeekly(
+          // Weeks are the block's user-defined counters, not calendar dates.
           weeklyVolume.map((w) => ({
-            week: parseDateOnly(w.week_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            week: `W${w.week}`,
             sets: Object.values(w.body_parts || {}).reduce((a, b) => a + b, 0),
           })),
         )

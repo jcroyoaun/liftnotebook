@@ -247,11 +247,12 @@ func groupByBodyPart(muscleMap map[int64]*MuscleVolume, muscleOrder []int64, bod
 	return result
 }
 
-// GetWeeklyVolume returns volume broken down by week for a mesocycle.
+// GetWeeklyVolume returns volume broken down by the block's USER-defined
+// weeks (workout_sessions.week_number) — never by calendar buckets.
 func (m VolumeModel) GetWeeklyVolume(userID, mesocycleID int64) ([]WeeklyVolumeData, error) {
 	query := `
 		SELECT
-			date_trunc('week', ws.performed_at) as week_start,
+			ws.week_number,
 			wset.exercise_id,
 			mu.body_part::text,
 			em.target_type::text,
@@ -261,8 +262,8 @@ func (m VolumeModel) GetWeeklyVolume(userID, mesocycleID int64) ([]WeeklyVolumeD
 		JOIN exercise_muscles em ON wset.exercise_id = em.exercise_id
 		JOIN muscles mu ON em.muscle_id = mu.id
 		WHERE ws.user_id = $1 AND ws.mesocycle_id = $2 AND wset.recorded = true
-		GROUP BY week_start, wset.exercise_id, mu.body_part, em.target_type
-		ORDER BY week_start, mu.body_part`
+		GROUP BY ws.week_number, wset.exercise_id, mu.body_part, em.target_type
+		ORDER BY ws.week_number, mu.body_part`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -274,32 +275,32 @@ func (m VolumeModel) GetWeeklyVolume(userID, mesocycleID int64) ([]WeeklyVolumeD
 	defer rows.Close()
 
 	type weekExBP struct {
-		weekStart  time.Time
+		week       int
 		exerciseID int64
 		bodyPart   string
 	}
 	bestType := make(map[weekExBP]string)
 	exSets := make(map[weekExBP]int)
-	var weekOrder []time.Time
-	weekSeen := make(map[time.Time]bool)
+	var weekOrder []int
+	weekSeen := make(map[int]bool)
 
 	for rows.Next() {
-		var weekStart time.Time
+		var week int
 		var exerciseID int64
 		var bodyPart, targetType string
 		var setCount int
 
-		err := rows.Scan(&weekStart, &exerciseID, &bodyPart, &targetType, &setCount)
+		err := rows.Scan(&week, &exerciseID, &bodyPart, &targetType, &setCount)
 		if err != nil {
 			return nil, err
 		}
 
-		if !weekSeen[weekStart] {
-			weekSeen[weekStart] = true
-			weekOrder = append(weekOrder, weekStart)
+		if !weekSeen[week] {
+			weekSeen[week] = true
+			weekOrder = append(weekOrder, week)
 		}
 
-		key := weekExBP{weekStart, exerciseID, bodyPart}
+		key := weekExBP{week, exerciseID, bodyPart}
 		if cur, ok := bestType[key]; !ok || (cur == "secondary" && targetType == "primary") {
 			bestType[key] = targetType
 		}
@@ -311,22 +312,22 @@ func (m VolumeModel) GetWeeklyVolume(userID, mesocycleID int64) ([]WeeklyVolumeD
 		return nil, err
 	}
 
-	weekMap := make(map[time.Time]map[string]float64)
+	weekMap := make(map[int]map[string]float64)
 	for key, tt := range bestType {
 		multiplier := 1.0
 		if tt == "secondary" {
 			multiplier = 0.5
 		}
-		if weekMap[key.weekStart] == nil {
-			weekMap[key.weekStart] = make(map[string]float64)
+		if weekMap[key.week] == nil {
+			weekMap[key.week] = make(map[string]float64)
 		}
-		weekMap[key.weekStart][key.bodyPart] += float64(exSets[key]) * multiplier
+		weekMap[key.week][key.bodyPart] += float64(exSets[key]) * multiplier
 	}
 
 	var result []WeeklyVolumeData
 	for _, week := range weekOrder {
 		wv := WeeklyVolumeData{
-			WeekStart: week,
+			Week:      week,
 			BodyParts: weekMap[week],
 		}
 		result = append(result, wv)
@@ -335,6 +336,6 @@ func (m VolumeModel) GetWeeklyVolume(userID, mesocycleID int64) ([]WeeklyVolumeD
 }
 
 type WeeklyVolumeData struct {
-	WeekStart time.Time          `json:"week_start"`
+	Week      int                `json:"week"`
 	BodyParts map[string]float64 `json:"body_parts"`
 }

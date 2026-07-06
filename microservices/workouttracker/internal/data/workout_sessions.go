@@ -19,9 +19,13 @@ type WorkoutSession struct {
 	Notes         *string   `json:"notes"`
 	// RecordedSets distinguishes real workouts from abandoned empty sessions
 	// (Start Workout creates the row before any set is logged).
-	RecordedSets int       `json:"recorded_sets"`
-	CreatedAt    time.Time `json:"-"`
-	Version      int32     `json:"version,omitzero"`
+	RecordedSets int `json:"recorded_sets"`
+	// WeekNumber is the block's user-defined week the session was logged in
+	// (stamped from mesocycles.current_week at creation) — weeks are never
+	// calendar-derived.
+	WeekNumber int       `json:"week_number"`
+	CreatedAt  time.Time `json:"-"`
+	Version    int32     `json:"version,omitzero"`
 }
 
 type WorkoutSessionModel struct {
@@ -29,10 +33,13 @@ type WorkoutSessionModel struct {
 }
 
 func (m WorkoutSessionModel) Insert(session *WorkoutSession) error {
+	// week_number is stamped from the block's current user-defined week at
+	// creation time — the session belongs to whatever week the lifter is in.
 	query := `
-		INSERT INTO workout_sessions (user_id, mesocycle_id, training_day_id, performed_at, notes)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, created_at, version`
+		INSERT INTO workout_sessions (user_id, mesocycle_id, training_day_id, performed_at, notes, week_number)
+		VALUES ($1, $2, $3, $4, $5,
+		        COALESCE((SELECT current_week FROM mesocycles WHERE id = $2 AND user_id = $1), 1))
+		RETURNING id, week_number, created_at, version`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -44,7 +51,7 @@ func (m WorkoutSessionModel) Insert(session *WorkoutSession) error {
 
 	return m.DB.QueryRowContext(ctx, query,
 		session.UserID, session.MesocycleID, session.TrainingDayID, performedAt, session.Notes,
-	).Scan(&session.ID, &session.CreatedAt, &session.Version)
+	).Scan(&session.ID, &session.WeekNumber, &session.CreatedAt, &session.Version)
 }
 
 func (m WorkoutSessionModel) Get(id, userID int64) (*WorkoutSession, error) {
@@ -52,7 +59,7 @@ func (m WorkoutSessionModel) Get(id, userID int64) (*WorkoutSession, error) {
 		SELECT ws.id, ws.user_id, ws.mesocycle_id, ws.training_day_id, td.label,
 		       ws.performed_at, ws.notes,
 		       (SELECT count(*) FROM workout_sets s WHERE s.workout_session_id = ws.id AND s.recorded),
-		       ws.created_at, ws.version
+		       ws.week_number, ws.created_at, ws.version
 		FROM workout_sessions ws
 		JOIN training_days td ON ws.training_day_id = td.id
 		WHERE ws.id = $1 AND ws.user_id = $2`
@@ -65,7 +72,7 @@ func (m WorkoutSessionModel) Get(id, userID int64) (*WorkoutSession, error) {
 	err := m.DB.QueryRowContext(ctx, query, id, userID).Scan(
 		&session.ID, &session.UserID, &session.MesocycleID, &session.TrainingDayID,
 		&session.DayLabel, &session.PerformedAt, &session.Notes, &session.RecordedSets,
-		&session.CreatedAt, &session.Version,
+		&session.WeekNumber, &session.CreatedAt, &session.Version,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -191,7 +198,7 @@ func (m WorkoutSessionModel) ListForMesocycle(userID, mesocycleID int64) ([]*Wor
 		SELECT ws.id, ws.user_id, ws.mesocycle_id, ws.training_day_id, td.label,
 		       ws.performed_at, ws.notes,
 		       (SELECT count(*) FROM workout_sets s WHERE s.workout_session_id = ws.id AND s.recorded),
-		       ws.created_at, ws.version
+		       ws.week_number, ws.created_at, ws.version
 		FROM workout_sessions ws
 		JOIN training_days td ON ws.training_day_id = td.id
 		WHERE ws.user_id = $1 AND ws.mesocycle_id = $2
@@ -212,7 +219,7 @@ func (m WorkoutSessionModel) ListForMesocycle(userID, mesocycleID int64) ([]*Wor
 		err := rows.Scan(
 			&s.ID, &s.UserID, &s.MesocycleID, &s.TrainingDayID,
 			&s.DayLabel, &s.PerformedAt, &s.Notes, &s.RecordedSets,
-			&s.CreatedAt, &s.Version,
+			&s.WeekNumber, &s.CreatedAt, &s.Version,
 		)
 		if err != nil {
 			return nil, err

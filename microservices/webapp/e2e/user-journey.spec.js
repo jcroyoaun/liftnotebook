@@ -354,6 +354,56 @@ test.describe.serial('Full User Journey', () => {
     await expect(page.locator('text=/\\d+(\\.\\d+)? primary/').first()).toBeVisible()
   })
 
+  // 7c. USER-DEFINED WEEKS — the week ends when the lifter says so, never
+  // on a calendar boundary.
+  test('7c. Start next week resets the day cards', async ({ page }) => {
+    await loginAndGo(page, '/')
+
+    // All three days are done, so the prominent advance button carries the
+    // week forward.
+    await page.click('button:has-text("start week 2")')
+    await page.getByRole('dialog').locator('button:has-text("Start next week")').click()
+
+    await expect(page.locator('text=Week 2 ·')).toBeVisible({ timeout: 5000 })
+    // Fresh week: no ✓ Done chips, day 1 is up next again.
+    await expect(page.locator('text=✓ Done')).toHaveCount(0)
+    await expect(page.locator('text=0 of 3 workouts this week')).toBeVisible()
+  })
+
+  test('7d. Edit plan opens the same workout view; changes save to the plan', async ({ page }) => {
+    await loginAndGo(page, '/')
+
+    // One view per workout: Edit plan lands in the logger, edit mode.
+    const pushDay = page.locator('[class*="rounded-card"]').filter({ hasText: 'Day 1: Push' })
+    await pushDay.locator('button:has-text("Edit plan")').click()
+    await page.waitForURL(/\/workout\/\d+/)
+    await expect(page.getByRole('button', { name: 'Done editing' })).toBeVisible()
+
+    // Add an exercise through the same sheet used mid-workout.
+    await page.click('button:has-text("+ Add exercise")')
+    const sheet = page.getByRole('dialog')
+    await sheet.locator('input[placeholder*="exercise"]').fill('Machine Row')
+    await sheet.locator('button:has-text("Machine Row (Chest Supported)")').click()
+    await sheet.locator('button:has-text("Add to workout")').click()
+    await expect(page.locator('text=Added this session')).toBeVisible()
+
+    // Save to the plan itself.
+    await page.getByRole('button', { name: 'Done editing' }).click()
+    await expect(page.locator('text=You went off-plan')).toBeVisible()
+    await page.click('button:has-text("All future workouts")')
+    await expect(page).toHaveURL('/')
+
+    // The day template now carries the row; the husk left no phantom workout.
+    await expect
+      .poll(async () => {
+        const data = await apiGet(`/mesocycles/${mesoId}`)
+        const push = (data.days || []).find((d) => d.label === 'Push')
+        return (push?.exercises || []).some((e) => e.exercise_id === 8)
+      }, { timeout: 10000 })
+      .toBe(true)
+    await expect(page.locator('text=0 of 3 workouts this week')).toBeVisible()
+  })
+
   // 8. WEEK 2 - progression
   test('8a. Week 2 Push workout (heavier)', async ({ page }) => {
     await loginAndGo(page, '/')

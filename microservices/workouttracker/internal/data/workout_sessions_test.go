@@ -45,10 +45,10 @@ func TestListForMesocycleExposesRecordedSetCounts(t *testing.T) {
 			sqlContains: "SELECT count(*) FROM workout_sets s WHERE s.workout_session_id = ws.id AND s.recorded",
 			args:        []driver.Value{int64(7), int64(3)},
 			rows: &stubRows{
-				columns: []string{"id", "user_id", "mesocycle_id", "training_day_id", "label", "performed_at", "notes", "recorded_sets", "created_at", "version"},
+				columns: []string{"id", "user_id", "mesocycle_id", "training_day_id", "label", "performed_at", "notes", "recorded_sets", "week_number", "created_at", "version"},
 				values: [][]driver.Value{
-					{int64(20), int64(7), int64(3), int64(1), "Push", now, nil, int64(6), now, int64(1)},
-					{int64(21), int64(7), int64(3), int64(2), "Pull", now, nil, int64(0), now, int64(1)},
+					{int64(20), int64(7), int64(3), int64(1), "Push", now, nil, int64(6), int64(2), now, int64(1)},
+					{int64(21), int64(7), int64(3), int64(2), "Pull", now, nil, int64(0), int64(2), now, int64(1)},
 				},
 			},
 		},
@@ -66,6 +66,9 @@ func TestListForMesocycleExposesRecordedSetCounts(t *testing.T) {
 	if sessions[0].RecordedSets != 6 || sessions[1].RecordedSets != 0 {
 		t.Errorf("recorded sets = %d/%d, want 6/0 (abandoned session must be distinguishable)",
 			sessions[0].RecordedSets, sessions[1].RecordedSets)
+	}
+	if sessions[0].WeekNumber != 2 {
+		t.Errorf("week_number = %d, want 2 (user-defined week rides the session)", sessions[0].WeekNumber)
 	}
 
 	stub.assertExhausted(t)

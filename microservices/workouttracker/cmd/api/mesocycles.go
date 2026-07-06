@@ -176,6 +176,33 @@ func (app *application) deleteMesocycleHandler(w http.ResponseWriter, r *http.Re
 	}
 }
 
+// Training weeks are user-defined: the lifter decides when a week is over,
+// regardless of the calendar or of how many days they completed.
+func (app *application) advanceWeekHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	userID := app.contextGetUserID(r)
+
+	week, err := app.models.Mesocycles.AdvanceWeek(id, userID)
+	if err != nil {
+		if errors.Is(err, data.ErrRecordNotFound) {
+			app.notFoundResponse(w, r)
+			return
+		}
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"current_week": week}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
 func (app *application) endMesocycleHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readIDParam(r)
 	if err != nil {

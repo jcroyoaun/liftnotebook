@@ -1,18 +1,11 @@
-export function getLatestWeeklyVolume(weeklyVolume) {
-  if (!Array.isArray(weeklyVolume) || weeklyVolume.length === 0) {
-    return [];
-  }
-
-  const latestWeek = weeklyVolume.reduce((latest, current) => {
-    if (!latest) {
-      return current;
-    }
-
-    return new Date(current.week_start) > new Date(latest.week_start) ? current : latest;
-  }, null);
-
-  return Object.entries(latestWeek.body_parts || {}).map(([body_part, total_sets]) => ({
+// Weeks are user-defined (mesocycles.current_week) — this picks the bucket
+// for the lifter's CURRENT week. A fresh week has no bucket yet and
+// correctly shows zeros; it never falls back to an older week's bars.
+export function getWeekVolume(weeklyVolume, week) {
+  if (!Array.isArray(weeklyVolume)) return []
+  const bucket = weeklyVolume.find((w) => w.week === week)
+  return Object.entries(bucket?.body_parts || {}).map(([body_part, total_sets]) => ({
     body_part,
     total_sets,
-  }));
+  }))
 }

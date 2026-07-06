@@ -33,6 +33,7 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodGet, "/v1/me/mesocycle", app.requireAuth(app.getActiveMesocycleHandler))
 	router.HandlerFunc(http.MethodGet, "/v1/mesocycles/:id", app.requireAuth(app.getMesocycleHandler))
 	router.HandlerFunc(http.MethodPost, "/v1/mesocycles/:id/end", app.requireAuth(app.endMesocycleHandler))
+	router.HandlerFunc(http.MethodPost, "/v1/mesocycles/:id/advance-week", app.requireAuth(app.advanceWeekHandler))
 	router.HandlerFunc(http.MethodDelete, "/v1/mesocycles/:id", app.requireAuth(app.deleteMesocycleHandler))
 	router.HandlerFunc(http.MethodGet, "/v1/mesocycles/:id/export", app.requireAuth(app.exportMesocycleHandler))
 
